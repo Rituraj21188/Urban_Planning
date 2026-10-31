@@ -1,0 +1,43 @@
+name: Run GeoPandas Building Detection
+
+on:
+  workflow_dispatch: # Allows you to manually trigger it with a single click in GitHub
+
+permissions:
+  contents: write # Needed to commit buildings.geojson back to your repo
+
+jobs:
+  extract-buildings:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Geospatial Libraries (GDAL/GEOS)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev gdal-bin
+
+      - name: Install Python Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install numpy scipy shapely rasterio geopandas
+
+      - name: Execute GeoPandas & Rasterio Detection
+        run: |
+          python process_cogs.py
+
+      - name: Commit and Push buildings.geojson
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add buildings.geojson
+          git commit -m "Auto-generate buildings.geojson via GeoPandas [skip ci]" || echo "No changes to commit"
+          git push
