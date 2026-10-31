@@ -3,44 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>COG Building Detection Engine</title>
+  <title>GeoAI 3D Building Digital Twin - Three.js / Deck.gl</title>
 
-  <!-- Leaflet Core Stylesheet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet-Geoman Drawing Tools -->
-  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-  
-  <!-- Modern UI Typography -->
+  <!-- MapLibre & Deck.gl Core -->
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/deck.gl@8.9.33/dist.min.js"></script>
+
+  <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg-dark: #090d16;
       --panel-bg: rgba(15, 23, 42, 0.92);
       --accent: #00f2fe;
-      --accent-glow: rgba(0, 242, 254, 0.25);
-      --accent-gradient: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      --danger: #f43f5e;
-      --danger-gradient: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+      --accent-glow: rgba(0, 242, 254, 0.3);
+      --accent-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --border-subtle: rgba(255, 255, 255, 0.12);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body, html { height: 100%; width: 100%; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; background: #000; }
-    #map { height: 100vh; width: 100%; z-index: 1; }
+    body, html { height: 100%; width: 100%; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; background: #050b14; }
+    #map-container { height: 100vh; width: 100%; position: absolute; top: 0; left: 0; }
 
-    /* Dashboard Interface Panel */
-    .dashboard-panel {
+    /* Glassmorphic Cyber GIS Dashboard */
+    .dashboard {
       position: absolute;
-      top: 18px;
-      right: 18px;
-      z-index: 1000;
-      width: 440px;
-      max-height: calc(100vh - 36px);
-      overflow-y: auto;
+      top: 20px;
+      right: 20px;
+      z-index: 10;
+      width: 420px;
       background: var(--panel-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -51,10 +46,10 @@
       color: var(--text-main);
     }
 
-    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    h2 { font-size: 16px; font-weight: 700; color: #fff; }
     
-    .status-badge {
+    .badge {
       padding: 3px 9px;
       border-radius: 20px;
       font-size: 10px;
@@ -62,389 +57,259 @@
       letter-spacing: 0.5px;
       text-transform: uppercase;
       font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 242, 254, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
     }
-    .badge-ready  { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
-    .badge-busy   { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
-    .badge-active { background: rgba(0, 242, 254, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
-    .badge-error  { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
 
-    p.desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4; }
+    p.subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
 
-    .form-group { margin-bottom: 12px; }
-    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; }
-    
-    .input-text {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.5);
+    .control-box {
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
-      padding: 9px 12px;
-      font-size: 11px;
-      font-family: 'JetBrains Mono', monospace;
-      color: #38bdf8;
-      outline: none;
-      transition: all 0.2s;
+      padding: 12px;
+      margin-bottom: 12px;
     }
-    .input-text:focus { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
 
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .control-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; font-weight: 600; }
+    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
     .btn {
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      transition: all 0.2s ease;
+      transition: all 0.2s;
       border: none;
     }
-    .btn-accent {
-      background: var(--accent-gradient);
-      color: #090d16;
-    }
+    .btn-accent { background: var(--accent-grad); color: #090d16; }
     .btn-accent:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text-main);
-      border: 1px solid var(--border-subtle);
-    }
+    .btn-secondary { background: rgba(255, 255, 255, 0.06); color: var(--text-main); border: 1px solid var(--border-subtle); }
     .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
-    .btn-detect {
-      grid-column: span 2;
-      background: var(--danger-gradient);
-      color: white;
-      box-shadow: 0 4px 15px rgba(244, 63, 94, 0.35);
-    }
-    .btn-detect:hover { filter: brightness(1.15); transform: translateY(-1px); }
-
-    .control-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 12px;
-    }
-    .control-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; }
-    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 
     .card {
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(0, 0, 0, 0.45);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       padding: 12px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
     .card h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
-    
-    .log-box {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: #cbd5e1;
-      line-height: 1.5;
-      max-height: 115px;
-      overflow-y: auto;
-      word-break: break-all;
-    }
 
-    pre.code-block {
-      background: #040810;
-      border: 1px solid rgba(0, 242, 254, 0.2);
-      border-radius: 6px;
-      padding: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      color: #38bdf8;
-      overflow-x: auto;
-      margin-top: 8px;
-      max-height: 120px;
-    }
+    .telemetry-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
+    .telemetry-row span.val { color: #38bdf8; font-weight: 600; }
   </style>
 </head>
 <body>
 
-  <div id="map"></div>
+  <div id="map-container"></div>
 
-  <div class="dashboard-panel">
+  <div class="dashboard">
     <div class="header-row">
-      <h2>Building Auto-Detector</h2>
-      <span id="systemBadge" class="status-badge badge-ready">READY</span>
+      <h2>3D Building Twin</h2>
+      <span class="badge" id="renderEngineBadge">THREE.JS / DECK.GL</span>
     </div>
-    <p class="desc">High-Performance COG Tile Streaming &amp; Spatial Vectorization</p>
+    <p class="subtitle">Real-Time Vector Extrusion from GeoPandas Pipeline</p>
 
-    <div class="form-group">
-      <label for="cogUrlInput">Direct Public COG / IPFS URL:</label>
-      <input 
-        type="text" 
-        id="cogUrlInput" 
-        class="input-text" 
-        value="https://ipfs.io/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv" 
-      />
+    <div class="control-box">
+      <div class="control-header">
+        <span>3D Vertical Extrusion Scale</span>
+        <span id="scaleVal" style="color:var(--accent); font-family:'JetBrains Mono'">1.0x</span>
+      </div>
+      <input type="range" id="extrusionSlider" min="0.5" max="3.0" step="0.1" value="1.0" />
+
+      <div class="control-header" style="margin-top: 10px;">
+        <span>Roof Pitch &amp; Camera Tilt</span>
+        <span id="pitchVal" style="color:var(--accent); font-family:'JetBrains Mono'">55°</span>
+      </div>
+      <input type="range" id="pitchSlider" min="0" max="75" step="5" value="55" />
     </div>
 
     <div class="btn-grid">
-      <button class="btn btn-accent" id="btnMountCog">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        Stream Tiles
-      </button>
-      <button class="btn btn-secondary" id="btnFitAssam">Assam ROI</button>
-      <button class="btn btn-detect" id="btnRunDetection">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7"/></svg>
-        Extract Building Footprints
-      </button>
+      <button class="btn btn-accent" id="btnRecenter">Reset View</button>
+      <button class="btn btn-secondary" id="btnToggleMesh">Wireframe Mode</button>
     </div>
 
-    <!-- Algorithm Tuner Controls -->
-    <div class="control-box">
-      <div class="control-header">
-        <span>Spectral Roof Contrast</span>
-        <span id="contrastVal" style="color:var(--accent); font-family:'JetBrains Mono'">40</span>
-      </div>
-      <input type="range" id="contrastSlider" min="15" max="85" value="40" />
-
-      <div class="control-header" style="margin-top: 8px;">
-        <span>Min Parcel Area Filter</span>
-        <span id="areaVal" style="color:var(--accent); font-family:'JetBrains Mono'">30 m²</span>
-      </div>
-      <input type="range" id="areaSlider" min="10" max="300" value="30" />
-    </div>
-
-    <!-- Status & Telemetry -->
     <div class="card">
-      <h4>Telemetry &amp; Activity Log</h4>
-      <div class="log-box" id="logContent">Click "Stream Tiles" to mount the dynamic XYZ pyramid.</div>
-    </div>
-
-    <!-- Spatial SQL / SpatiaLite Output -->
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <h4>SpatiaLite Pipeline</h4>
-        <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 10px;" id="btnCopySql">Copy SQL</button>
-      </div>
-      <pre class="code-block" id="sqlBox">-- Draw an ROI or run detection to generate SQL</pre>
+      <h4>Telemetry &amp; Extraction Metrics</h4>
+      <div class="telemetry-row"><span>Layer Status:</span><span class="val" id="statusVal">Loading Vector GeoJSON...</span></div>
+      <div class="telemetry-row"><span>Total Structures:</span><span class="val" id="bldgCountVal">--</span></div>
+      <div class="telemetry-row"><span>Avg Building Height:</span><span class="val" id="avgHeightVal">--</span></div>
+      <div class="telemetry-row"><span>Projection CRS:</span><span class="val">EPSG:4326 (WGS84)</span></div>
     </div>
   </div>
 
-  <!-- CDN Dependencies -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-
   <script>
-    // 1. Initialize Map Canvas with World Imagery
-    const map = L.map('map', { zoomControl: false }).setView([26.985, 94.635], 16);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    // Free High-Resolution Satellite Basemap (Zero API Key Requirement)
-    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 22,
-      attribution: 'Esri World Imagery'
-    }).addTo(map);
-
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: 'OSM contributors'
-    });
-
-    L.control.layers({
-      "Satellite Imagery": satelliteLayer,
-      "Street Map": osmLayer
-    }, null, { position: 'topleft' }).addTo(map);
-
-    // 2. Geoman Area Drawing Tools
-    map.pm.addControls({
-      position: 'topleft',
-      drawCircle: false,
-      drawCircleMarker: false,
-      drawPolyline: false,
-      drawMarker: false,
-      drawText: false,
-      cutPolygon: false
-    });
-
-    let currentCogTileLayer = null;
-    let detectedVectorLayer = L.geoJSON(null).addTo(map);
-
-    const systemBadge = document.getElementById('systemBadge');
-    const logContent = document.getElementById('logContent');
-    const sqlBox = document.getElementById('sqlBox');
-
-    // Sync Slider Text
-    document.getElementById('contrastSlider').addEventListener('input', (e) => {
-      document.getElementById('contrastVal').innerText = e.target.value;
-    });
-    document.getElementById('areaSlider').addEventListener('input', (e) => {
-      document.getElementById('areaVal').innerText = e.target.value + " m²";
-    });
-
-    // 3. Dynamic Tile Streaming Engine (Bypasses JavaScript memory / range request timeouts)
-    function mountCOGStream() {
-      const rawUrl = document.getElementById('cogUrlInput').value.trim();
-      if (!rawUrl) {
-        alert("Please provide a valid COG URL.");
-        return;
-      }
-
-      systemBadge.className = 'status-badge badge-busy';
-      systemBadge.innerText = 'INITIALIZING';
-      logContent.innerHTML = `Mounting dynamic tile pipeline for:<br><code>${rawUrl}</code>`;
-
-      if (currentCogTileLayer) {
-        map.removeLayer(currentCogTileLayer);
-      }
-
-      // Route the COG through dynamic XYZ web tiles
-      const titilerEndpoint = `https://titiler.xyz/cog/tiles/{z}/{x}/{y}.png?url=${encodeURIComponent(rawUrl)}`;
-
-      currentCogTileLayer = L.tileLayer(titilerEndpoint, {
-        maxZoom: 22,
-        opacity: 1.0,
-        attribution: 'COG Stream | TiTiler'
-      });
-
-      currentCogTileLayer.addTo(map);
-
-      currentCogTileLayer.on('tileload', () => {
-        systemBadge.className = 'status-badge badge-active';
-        systemBadge.innerText = 'STREAMING';
-      });
-
-      currentCogTileLayer.on('tileerror', () => {
-        // If the public TiTiler endpoint is throttled or gateway is warming up
-        logContent.innerHTML = `<span style="color:#f43f5e">Notice:</span> Gateway chunks are synchronizing. If blank, verify your IPFS gateway URL is active.`;
-      });
-
-      logContent.innerHTML = `<b>Tile Engine Active:</b><br>` +
-        `• Streaming mode: Dynamic XYZ pyramidal tiles<br>` +
-        `• Resolution: Full-fidelity server rendering<br>` +
-        `• Zoom Extent: Max zoom 22 supported`;
-    }
-
-    document.getElementById('btnMountCog').addEventListener('click', mountCOGStream);
-
-    document.getElementById('btnFitAssam').addEventListener('click', () => {
-      map.setView([26.985, 94.635], 16);
-    });
-
-    // 4. Client-Side Building Extraction Algorithm
-    function runBuildingDetection() {
-      systemBadge.className = 'status-badge badge-busy';
-      systemBadge.innerText = 'INFERENCING';
-      logContent.innerHTML = "Sampling viewport spatial extent and vectorizing boundaries...";
-
-      const bounds = map.getBounds();
-      const minX = bounds.getWest();
-      const minY = bounds.getSouth();
-      const maxX = bounds.getEast();
-      const maxY = bounds.getNorth();
-
-      const threshold = parseInt(document.getElementById('contrastSlider').value);
-      const minAreaThreshold = parseInt(document.getElementById('areaSlider').value);
-
-      setTimeout(() => {
-        detectedVectorLayer.clearLayers();
-
-        let detectedPolygons = [];
-        const stepLon = (maxX - minX) / 28;
-        const stepLat = (maxY - minY) / 28;
-        let count = 0;
-
-        for (let lat = minY; lat < maxY - stepLat; lat += stepLat) {
-          for (let lon = minX; lon < maxX - stepLon; lon += stepLon) {
-            // Structural spatial variance algorithm
-            const hash = Math.sin(lat * 8000 + lon * 4000) * 10000;
-            const pseudoSpectral = Math.abs(hash - Math.floor(hash)) * 100;
-
-            if (pseudoSpectral > (70 - threshold * 0.45) && pseudoSpectral < 88) {
-              const pMinX = lon + stepLon * 0.12;
-              const pMaxX = lon + stepLon * 0.88;
-              const pMinY = lat + stepLat * 0.12;
-              const pMaxY = lat + stepLat * 0.88;
-
-              // Generate regularized orthogonal footprint polygon
-              const poly = turf.polygon([[
-                [pMinX, pMinY],
-                [pMaxX, pMinY],
-                [pMaxX, pMaxY],
-                [pMinX, pMaxY],
-                [pMinX, pMinY]
-              ]]);
-
-              const areaM2 = turf.area(poly);
-
-              if (areaM2 >= minAreaThreshold) {
-                count++;
-                poly.properties = {
-                  id: `STR-${count.toString().padStart(3, '0')}`,
-                  area_m2: Math.round(areaM2),
-                  confidence: (0.86 + (pseudoSpectral % 10) * 0.012).toFixed(2)
-                };
-                detectedPolygons.push(poly);
-              }
-            }
+    // 1. Initialize MapLibre Canvas with Satellite Basemap
+    const map = new maplibregl.Map({
+      container: 'map-container',
+      style: {
+        version: 8,
+        sources: {
+          'esri-satellite': {
+            type: 'raster',
+            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256
           }
-        }
-
-        const featureCollection = turf.featureCollection(detectedPolygons);
-
-        // Display detected vector boundaries
-        detectedVectorLayer.addData(featureCollection);
-        detectedVectorLayer.setStyle({
-          color: '#00f2fe',
-          weight: 2,
-          fillColor: '#00f2fe',
-          fillOpacity: 0.28
-        });
-
-        // Interactive inspection popup
-        detectedVectorLayer.bindPopup((layer) => {
-          const p = layer.feature.properties;
-          return `<div style="font-family:'Plus Jakarta Sans', sans-serif;">` +
-                 `<b style="color:#0284c7;">Structure ${p.id}</b><br>` +
-                 `Calculated Footprint: <b>${p.area_m2} m²</b><br>` +
-                 `Model Confidence: <b>${p.confidence}</b>` +
-                 `</div>`;
-        });
-
-        systemBadge.className = 'status-badge badge-ready';
-        systemBadge.innerText = 'EXTRACTED';
-        logContent.innerHTML = `<b>Extraction Completed:</b><br>` +
-          `• Total Structures Isolated: <b>${count}</b><br>` +
-          `• Minimum Area Filter: &ge; ${minAreaThreshold} m²<br>` +
-          `• Regularization: Orthogonalized ($90^\\circ$) vector geometries`;
-
-        // Generate SpatiaLite query for this exact viewport
-        sqlBox.innerText = 
-`-- SpatiaLite Orthogonalization Query for Current Viewport
-SELECT 
-  id,
-  ST_Area(geom) as area_sqm,
-  AsGeoJSON(
-    ST_SimplifyPreserveTopology(
-      ST_Orthogonalize(geom, 0.35), 0.15
-    )
-  ) AS building_footprint
-FROM raw_inferred_footprints
-WHERE MbrIntersects(geom, BuildMbr(${minX.toFixed(6)}, ${minY.toFixed(6)}, ${maxX.toFixed(6)}, ${maxY.toFixed(6)}, 4326))
-  AND ST_Area(geom) >= ${minAreaThreshold};`;
-      }, 300);
-    }
-
-    document.getElementById('btnRunDetection').addEventListener('click', runBuildingDetection);
-
-    // Geoman manual bounding box handler
-    map.on('pm:create', (e) => {
-      const b = e.layer.getBounds();
-      e.layer.setStyle({ color: '#f43f5e', fillColor: '#f43f5e', fillOpacity: 0.15, weight: 2 });
-      logContent.innerHTML = `<b>Manual ROI Selected:</b><br>BBox: [${b.getSouth().toFixed(5)}, ${b.getWest().toFixed(5)}] to [${b.getNorth().toFixed(5)}, ${b.getEast().toFixed(5)}]`;
-      runBuildingDetection();
+        },
+        layers: [{
+          id: 'esri-satellite-layer',
+          type: 'raster',
+          source: 'esri-satellite',
+          minzoom: 0,
+          maxzoom: 22
+        }]
+      },
+      center: [94.635, 26.985],
+      zoom: 16.5,
+      pitch: 55,
+      bearing: -20,
+      antialias: true
     });
 
-    document.getElementById('btnCopySql').addEventListener('click', () => {
-      navigator.clipboard.writeText(sqlBox.innerText);
-      alert("SpatiaLite SQL copied to clipboard!");
+    let deckOverlay = null;
+    let extrusionMultiplier = 1.0;
+    let wireframeState = false;
+    let geojsonData = null;
+
+    // 2. Fetch the GeoPandas-generated Building GeoJSON
+    async function loadBuildingFootprints() {
+      try {
+        const response = await fetch('buildings.geojson');
+        if (!response.ok) {
+          throw new Error('buildings.geojson not found in repository root.');
+        }
+        geojsonData = await response.json();
+
+        // Calculate telemetry metrics
+        const total = geojsonData.features.length;
+        let sumHeight = 0;
+        geojsonData.features.forEach(f => {
+          sumHeight += (f.properties.height_m || 6.5);
+        });
+        const avg = (sumHeight / total).toFixed(1);
+
+        document.getElementById('statusVal').innerText = "Online (Extruded)";
+        document.getElementById('bldgCountVal').innerText = `${total} buildings`;
+        document.getElementById('avgHeightVal').innerText = `${avg} m`;
+
+        renderDeckExtrusion();
+
+      } catch (err) {
+        console.warn(err);
+        document.getElementById('statusVal').innerText = "Simulating Demo Twin";
+        // Fallback procedural footprint generator if GeoJSON is not yet committed
+        generateProceduralBuildings();
+      }
+    }
+
+    // 3. Render 3D Extrusion using WebGL Shaders (Deck.gl GeoJsonLayer)
+    function renderDeckExtrusion() {
+      if (!geojsonData) return;
+
+      const buildingLayer = new deck.GeoJsonLayer({
+        id: 'geojson-extrusion-layer',
+        data: geojsonData,
+        extruded: true,
+        wireframe: wireframeState,
+        getElevation: f => (f.properties.height_m || 6.0) * extrusionMultiplier,
+        getFillColor: f => {
+          const h = (f.properties.height_m || 6.0);
+          // Color ramp based on elevation: Cyan to Electric Blue to Deep Indigo
+          if (h > 12) return [0, 242, 254, 230];
+          if (h > 6) return [56, 189, 248, 220];
+          return [30, 58, 138, 200];
+        },
+        getLineColor: [0, 242, 254, 255],
+        lineWidthMinPixels: 1,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [244, 63, 94, 220],
+        material: {
+          ambient: 0.35,
+          diffuse: 0.6,
+          shininess: 32,
+          specularColor: [255, 255, 255]
+        }
+      });
+
+      if (!deckOverlay) {
+        deckOverlay = new deck.MapboxOverlay({
+          layers: [buildingLayer]
+        });
+        map.addControl(deckOverlay);
+      } else {
+        deckOverlay.setProps({ layers: [buildingLayer] });
+      }
+    }
+
+    // Demo twin fallback so the WebUI displays extruded structures immediately
+    function generateProceduralBuildings() {
+      const demoFeatures = [];
+      const centerLon = 94.635;
+      const centerLat = 26.985;
+
+      for (let i = 0; i < 45; i++) {
+        const offX = (Math.random() - 0.5) * 0.005;
+        const offY = (Math.random() - 0.5) * 0.005;
+        const w = 0.0003 + Math.random() * 0.0002;
+        const h = 0.0003 + Math.random() * 0.0002;
+        const heightM = 4.0 + Math.random() * 14.0;
+
+        demoFeatures.push({
+          type: "Feature",
+          properties: { id: `DEMO-${i+1}`, height_m: heightM, area_m2: Math.round(w * 111000 * h * 111000) },
+          geometry: {
+            type: "Polygon",
+            coordinates: [[
+              [centerLon + offX, centerLat + offY],
+              [centerLon + offX + w, centerLat + offY],
+              [centerLon + offX + w, centerLat + offY + h],
+              [centerLon + offX, centerLat + offY + h],
+              [centerLon + offX, centerLat + offY]
+            ]]
+          }
+        });
+      }
+
+      geojsonData = { type: "FeatureCollection", features: demoFeatures };
+      document.getElementById('bldgCountVal').innerText = "45 demo units";
+      document.getElementById('avgHeightVal').innerText = "8.2 m";
+      renderDeckExtrusion();
+    }
+
+    // 4. UI Interactive Controls
+    document.getElementById('extrusionSlider').addEventListener('input', (e) => {
+      extrusionMultiplier = parseFloat(e.target.value);
+      document.getElementById('scaleVal').innerText = extrusionMultiplier.toFixed(1) + "x";
+      renderDeckExtrusion();
+    });
+
+    document.getElementById('pitchSlider').addEventListener('input', (e) => {
+      const pitch = parseInt(e.target.value);
+      map.setPitch(pitch);
+      document.getElementById('pitchVal').innerText = pitch + "°";
+    });
+
+    document.getElementById('btnToggleMesh').addEventListener('click', () => {
+      wireframeState = !wireframeState;
+      document.getElementById('btnToggleMesh').innerText = wireframeState ? "Solid Mode" : "Wireframe Mode";
+      renderDeckExtrusion();
+    });
+
+    document.getElementById('btnRecenter').addEventListener('click', () => {
+      map.flyTo({ center: [94.635, 26.985], zoom: 16.5, pitch: 55, bearing: -20 });
+    });
+
+    map.on('load', () => {
+      loadBuildingFootprints();
     });
   </script>
 </body>
