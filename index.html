@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GeoAI 3D Building Digital Twin - Three.js / Deck.gl</title>
+  <title>GeoAI 3D Building Twin - Filebase COG Stream</title>
 
   <!-- MapLibre & Deck.gl Core -->
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/deck.gl@8.9.33/dist.min.js"></script>
 
-  <!-- Typography -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --panel-bg: rgba(15, 23, 42, 0.92);
+      --panel-bg: rgba(15, 23, 42, 0.94);
       --accent: #00f2fe;
       --accent-glow: rgba(0, 242, 254, 0.3);
       --accent-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
@@ -29,13 +29,15 @@
     body, html { height: 100%; width: 100%; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; background: #050b14; }
     #map-container { height: 100vh; width: 100%; position: absolute; top: 0; left: 0; }
 
-    /* Glassmorphic Cyber GIS Dashboard */
+    /* Floating Cyber GIS Dashboard */
     .dashboard {
       position: absolute;
       top: 20px;
       right: 20px;
       z-index: 10;
-      width: 420px;
+      width: 430px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
       background: var(--panel-bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -103,8 +105,8 @@
     }
     .card h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
 
-    .telemetry-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; font-family: 'JetBrains Mono', monospace; }
-    .telemetry-row span.val { color: #38bdf8; font-weight: 600; }
+    .telemetry-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+    .telemetry-row span.val { color: #38bdf8; font-weight: 600; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -113,41 +115,52 @@
 
   <div class="dashboard">
     <div class="header-row">
-      <h2>3D Building Twin</h2>
-      <span class="badge" id="renderEngineBadge">THREE.JS / DECK.GL</span>
+      <h2>3D Digital Twin</h2>
+      <span class="badge" id="renderBadge">ONLINE</span>
     </div>
-    <p class="subtitle">Real-Time Vector Extrusion from GeoPandas Pipeline</p>
+    <p class="subtitle">Direct COG Stream &amp; 3D Extrusion Engine</p>
 
     <div class="control-box">
       <div class="control-header">
-        <span>3D Vertical Extrusion Scale</span>
+        <span>3D Extrusion Vertical Scale</span>
         <span id="scaleVal" style="color:var(--accent); font-family:'JetBrains Mono'">1.0x</span>
       </div>
       <input type="range" id="extrusionSlider" min="0.5" max="3.0" step="0.1" value="1.0" />
 
       <div class="control-header" style="margin-top: 10px;">
-        <span>Roof Pitch &amp; Camera Tilt</span>
+        <span>Camera Tilt (Pitch)</span>
         <span id="pitchVal" style="color:var(--accent); font-family:'JetBrains Mono'">55°</span>
       </div>
       <input type="range" id="pitchSlider" min="0" max="75" step="5" value="55" />
+
+      <div class="control-header" style="margin-top: 10px;">
+        <span>Ortho Layer Opacity</span>
+        <span id="opacityVal" style="color:var(--accent); font-family:'JetBrains Mono'">100%</span>
+      </div>
+      <input type="range" id="opacitySlider" min="0" max="100" step="5" value="100" />
     </div>
 
     <div class="btn-grid">
-      <button class="btn btn-accent" id="btnRecenter">Reset View</button>
-      <button class="btn btn-secondary" id="btnToggleMesh">Wireframe Mode</button>
+      <button class="btn btn-accent" id="btnZoomSurvey">Zoom to Survey</button>
+      <button class="btn btn-secondary" id="btnToggleWireframe">Wireframe Mode</button>
     </div>
 
     <div class="card">
-      <h4>Telemetry &amp; Extraction Metrics</h4>
-      <div class="telemetry-row"><span>Layer Status:</span><span class="val" id="statusVal">Loading Vector GeoJSON...</span></div>
-      <div class="telemetry-row"><span>Total Structures:</span><span class="val" id="bldgCountVal">--</span></div>
-      <div class="telemetry-row"><span>Avg Building Height:</span><span class="val" id="avgHeightVal">--</span></div>
-      <div class="telemetry-row"><span>Projection CRS:</span><span class="val">EPSG:4326 (WGS84)</span></div>
+      <h4>Telemetry &amp; Coordinate Alignment</h4>
+      <div class="telemetry-row"><span>Ortho CID:</span><span class="val">QmYYCV...zcayv</span></div>
+      <div class="telemetry-row"><span>Survey Center:</span><span class="val" id="surveyCoordVal">Detecting...</span></div>
+      <div class="telemetry-row"><span>Footprints Loaded:</span><span class="val" id="bldgCountVal">Reading GeoJSON...</span></div>
+      <div class="telemetry-row"><span>Tile Pipeline:</span><span class="val">TiTiler Cloud Pyramid</span></div>
     </div>
   </div>
 
   <script>
-    // 1. Initialize MapLibre Canvas with Satellite Basemap
+    // 1. IPFS Gateway links for your uploaded files
+    const ORTHO_IPFS_URL = "https://ipfs.filebase.io/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv";
+    const TITILER_BASE = "https://titiler.xyz/cog";
+    const TILE_STREAM_URL = `${TITILER_BASE}/tiles/{z}/{x}/{y}.png?url=${encodeURIComponent(ORTHO_IPFS_URL)}`;
+
+    // Default startup position (Initial overview of Assam)
     const map = new maplibregl.Map({
       container: 'map-container',
       style: {
@@ -167,62 +180,109 @@
           maxzoom: 22
         }]
       },
-      center: [94.635, 26.985],
-      zoom: 16.5,
+      center: [91.736, 26.144], // Default Guwahati center
+      zoom: 14,
       pitch: 55,
-      bearing: -20,
+      bearing: -15,
       antialias: true
     });
 
     let deckOverlay = null;
-    let extrusionMultiplier = 1.0;
-    let wireframeState = false;
-    let geojsonData = null;
+    let extrusionScale = 1.0;
+    let isWireframe = false;
+    let surveyBounds = null;
+    let surveyCenter = null;
+    let buildingGeoJSON = null;
 
-    // 2. Fetch the GeoPandas-generated Building GeoJSON
-    async function loadBuildingFootprints() {
+    // 2. Query TiTiler for the exact geographic bounds of your Orthomosaic
+    async function locateSurveyBounds() {
       try {
-        const response = await fetch('buildings.geojson');
-        if (!response.ok) {
-          throw new Error('buildings.geojson not found in repository root.');
+        const boundsUrl = `${TITILER_BASE}/bounds?url=${encodeURIComponent(ORTHO_IPFS_URL)}`;
+        const res = await fetch(boundsUrl);
+        const data = await res.json();
+
+        if (data.bounds) {
+          surveyBounds = data.bounds; // [minx, miny, maxx, maxy]
+          surveyCenter = [
+            (surveyBounds[0] + surveyBounds[2]) / 2,
+            (surveyBounds[1] + surveyBounds[3]) / 2
+          ];
+
+          document.getElementById('surveyCoordVal').innerText = 
+            `${surveyCenter[0].toFixed(5)}, ${surveyCenter[1].toFixed(5)}`;
+
+          // Re-center directly to the survey location
+          map.flyTo({
+            center: surveyCenter,
+            zoom: 17,
+            pitch: 55,
+            bearing: -15,
+            duration: 2500
+          });
         }
-        geojsonData = await response.json();
-
-        // Calculate telemetry metrics
-        const total = geojsonData.features.length;
-        let sumHeight = 0;
-        geojsonData.features.forEach(f => {
-          sumHeight += (f.properties.height_m || 6.5);
-        });
-        const avg = (sumHeight / total).toFixed(1);
-
-        document.getElementById('statusVal').innerText = "Online (Extruded)";
-        document.getElementById('bldgCountVal').innerText = `${total} buildings`;
-        document.getElementById('avgHeightVal').innerText = `${avg} m`;
-
-        renderDeckExtrusion();
-
       } catch (err) {
-        console.warn(err);
-        document.getElementById('statusVal').innerText = "Simulating Demo Twin";
-        // Fallback procedural footprint generator if GeoJSON is not yet committed
-        generateProceduralBuildings();
+        console.warn("Could not query COG bounds API directly:", err);
+        document.getElementById('surveyCoordVal').innerText = "Assam Survey ROI";
       }
     }
 
-    // 3. Render 3D Extrusion using WebGL Shaders (Deck.gl GeoJsonLayer)
-    function renderDeckExtrusion() {
-      if (!geojsonData) return;
+    // 3. Mount the Orthomosaic as an active raster tile layer
+    function mountOrthoStream() {
+      if (map.getSource('filebase-ortho-source')) return;
 
-      const buildingLayer = new deck.GeoJsonLayer({
-        id: 'geojson-extrusion-layer',
-        data: geojsonData,
+      map.addSource('filebase-ortho-source', {
+        type: 'raster',
+        tiles: [TILE_STREAM_URL],
+        tileSize: 256
+      });
+
+      map.addLayer({
+        id: 'filebase-ortho-layer',
+        type: 'raster',
+        source: 'filebase-ortho-source',
+        minzoom: 10,
+        maxzoom: 22,
+        paint: {
+          'raster-opacity': 1.0
+        }
+      });
+    }
+
+    // 4. Load Building Vector Footprints and render with Deck.gl
+    async function loadBuildingFootprints() {
+      try {
+        const res = await fetch('buildings.geojson');
+        if (!res.ok) throw new Error("buildings.geojson not found");
+        buildingGeoJSON = await res.json();
+
+        document.getElementById('bldgCountVal').innerText = 
+          `${buildingGeoJSON.features.length} structures`;
+
+        // If the GeoJSON has real features, zoom directly to them
+        if (buildingGeoJSON.features.length > 0 && !surveyBounds) {
+          const firstCoord = buildingGeoJSON.features[0].geometry.coordinates[0][0];
+          map.flyTo({ center: [firstCoord[0], firstCoord[1]], zoom: 17, pitch: 55 });
+        }
+
+        render3DBuildings();
+      } catch (err) {
+        console.warn(err);
+        document.getElementById('bldgCountVal').innerText = "Pending Workflow Output";
+      }
+    }
+
+    // 5. Render 3D Extruded Buildings using Deck.gl
+    function render3DBuildings() {
+      if (!buildingGeoJSON) return;
+
+      const layer = new deck.GeoJsonLayer({
+        id: 'deck-buildings-layer',
+        data: buildingGeoJSON,
         extruded: true,
-        wireframe: wireframeState,
-        getElevation: f => (f.properties.height_m || 6.0) * extrusionMultiplier,
+        wireframe: isWireframe,
+        getElevation: f => (f.properties.height_m || 6.5) * extrusionScale,
         getFillColor: f => {
-          const h = (f.properties.height_m || 6.0);
-          // Color ramp based on elevation: Cyan to Electric Blue to Deep Indigo
+          const h = f.properties.height_m || 6.5;
           if (h > 12) return [0, 242, 254, 230];
           if (h > 6) return [56, 189, 248, 220];
           return [30, 58, 138, 200];
@@ -231,65 +291,28 @@
         lineWidthMinPixels: 1,
         pickable: true,
         autoHighlight: true,
-        highlightColor: [244, 63, 94, 220],
+        highlightColor: [244, 63, 94, 230],
         material: {
           ambient: 0.35,
-          diffuse: 0.6,
+          diffuse: 0.65,
           shininess: 32,
           specularColor: [255, 255, 255]
         }
       });
 
       if (!deckOverlay) {
-        deckOverlay = new deck.MapboxOverlay({
-          layers: [buildingLayer]
-        });
+        deckOverlay = new deck.MapboxOverlay({ layers: [layer] });
         map.addControl(deckOverlay);
       } else {
-        deckOverlay.setProps({ layers: [buildingLayer] });
+        deckOverlay.setProps({ layers: [layer] });
       }
     }
 
-    // Demo twin fallback so the WebUI displays extruded structures immediately
-    function generateProceduralBuildings() {
-      const demoFeatures = [];
-      const centerLon = 94.635;
-      const centerLat = 26.985;
-
-      for (let i = 0; i < 45; i++) {
-        const offX = (Math.random() - 0.5) * 0.005;
-        const offY = (Math.random() - 0.5) * 0.005;
-        const w = 0.0003 + Math.random() * 0.0002;
-        const h = 0.0003 + Math.random() * 0.0002;
-        const heightM = 4.0 + Math.random() * 14.0;
-
-        demoFeatures.push({
-          type: "Feature",
-          properties: { id: `DEMO-${i+1}`, height_m: heightM, area_m2: Math.round(w * 111000 * h * 111000) },
-          geometry: {
-            type: "Polygon",
-            coordinates: [[
-              [centerLon + offX, centerLat + offY],
-              [centerLon + offX + w, centerLat + offY],
-              [centerLon + offX + w, centerLat + offY + h],
-              [centerLon + offX, centerLat + offY + h],
-              [centerLon + offX, centerLat + offY]
-            ]]
-          }
-        });
-      }
-
-      geojsonData = { type: "FeatureCollection", features: demoFeatures };
-      document.getElementById('bldgCountVal').innerText = "45 demo units";
-      document.getElementById('avgHeightVal').innerText = "8.2 m";
-      renderDeckExtrusion();
-    }
-
-    // 4. UI Interactive Controls
+    // 6. UI Interaction Controls
     document.getElementById('extrusionSlider').addEventListener('input', (e) => {
-      extrusionMultiplier = parseFloat(e.target.value);
-      document.getElementById('scaleVal').innerText = extrusionMultiplier.toFixed(1) + "x";
-      renderDeckExtrusion();
+      extrusionScale = parseFloat(e.target.value);
+      document.getElementById('scaleVal').innerText = extrusionScale.toFixed(1) + "x";
+      render3DBuildings();
     });
 
     document.getElementById('pitchSlider').addEventListener('input', (e) => {
@@ -298,17 +321,31 @@
       document.getElementById('pitchVal').innerText = pitch + "°";
     });
 
-    document.getElementById('btnToggleMesh').addEventListener('click', () => {
-      wireframeState = !wireframeState;
-      document.getElementById('btnToggleMesh').innerText = wireframeState ? "Solid Mode" : "Wireframe Mode";
-      renderDeckExtrusion();
+    document.getElementById('opacitySlider').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      document.getElementById('opacityVal').innerText = val + "%";
+      if (map.getLayer('filebase-ortho-layer')) {
+        map.setPaintProperty('filebase-ortho-layer', 'raster-opacity', val / 100);
+      }
     });
 
-    document.getElementById('btnRecenter').addEventListener('click', () => {
-      map.flyTo({ center: [94.635, 26.985], zoom: 16.5, pitch: 55, bearing: -20 });
+    document.getElementById('btnToggleWireframe').addEventListener('click', () => {
+      isWireframe = !isWireframe;
+      document.getElementById('btnToggleWireframe').innerText = isWireframe ? "Solid Mode" : "Wireframe Mode";
+      render3DBuildings();
+    });
+
+    document.getElementById('btnZoomSurvey').addEventListener('click', () => {
+      if (surveyCenter) {
+        map.flyTo({ center: surveyCenter, zoom: 17, pitch: 55 });
+      } else {
+        locateSurveyBounds();
+      }
     });
 
     map.on('load', () => {
+      mountOrthoStream();
+      locateSurveyBounds();
       loadBuildingFootprints();
     });
   </script>
