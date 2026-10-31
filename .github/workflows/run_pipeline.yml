@@ -1,10 +1,10 @@
 name: Run GeoPandas Building Detection
 
 on:
-  workflow_dispatch: # Allows you to manually trigger it with a single click in GitHub
+  workflow_dispatch:
 
 permissions:
-  contents: write # Needed to commit buildings.geojson back to your repo
+  contents: write
 
 jobs:
   extract-buildings:
@@ -18,16 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install System Geospatial Libraries (GDAL/GEOS)
+      - name: Install Geospatial Python Libraries
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev gdal-bin
-
-      - name: Install Python Dependencies
-        run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install numpy scipy shapely rasterio geopandas
 
       - name: Execute GeoPandas & Rasterio Detection
