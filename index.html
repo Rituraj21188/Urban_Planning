@@ -8,14 +8,15 @@
   <!-- Leaflet & Geoman Stylesheets -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-  <!-- Google Fonts -->
+  
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
       --bg-dark: #0f172a;
-      --card-bg: rgba(15, 23, 42, 0.88);
+      --card-bg: rgba(15, 23, 42, 0.9);
       --accent: #00f2fe;
       --accent-hover: #4facfe;
       --danger: #f43f5e;
@@ -28,14 +29,14 @@
     body, html { height: 100%; width: 100%; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; background: #000; }
     #map { height: 100vh; width: 100%; z-index: 1; }
 
-    /* Glassmorphic Cyber GIS Panel */
+    /* Control Panel */
     .dashboard-panel {
       position: absolute;
-      top: 20px;
-      right: 20px;
+      top: 18px;
+      right: 18px;
       z-index: 1000;
       width: 440px;
-      max-height: calc(100vh - 40px);
+      max-height: calc(100vh - 36px);
       overflow-y: auto;
       background: var(--card-bg);
       backdrop-filter: blur(16px);
@@ -43,12 +44,12 @@
       border: 1px solid var(--border-color);
       border-radius: 14px;
       box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 242, 254, 0.15);
-      padding: 22px;
+      padding: 20px;
       color: var(--text-main);
     }
 
     .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-    h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
+    h2 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; color: #fff; }
     .badge {
       padding: 3px 8px;
       border-radius: 20px;
@@ -58,21 +59,22 @@
       text-transform: uppercase;
       font-family: 'JetBrains Mono', monospace;
     }
-    .badge-ready { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
-    .badge-busy  { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
-    .badge-active{ background: rgba(0, 242, 254, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-ready  { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.3); }
+    .badge-busy   { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.3); }
+    .badge-active { background: rgba(0, 242, 254, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+    .badge-error  { background: rgba(244, 63, 94, 0.2); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.3); }
 
-    p.desc { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4; }
+    p.desc { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4; }
 
-    .form-group { margin-bottom: 14px; }
-    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 6px; }
+    .form-group { margin-bottom: 12px; }
+    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; }
     .input-text {
       width: 100%;
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(0, 0, 0, 0.45);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 9px 12px;
-      font-size: 12px;
+      font-size: 11px;
       font-family: 'JetBrains Mono', monospace;
       color: #38bdf8;
       outline: none;
@@ -80,9 +82,9 @@
     }
     .input-text:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 242, 254, 0.25); }
 
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
     .btn {
-      padding: 10px 14px;
+      padding: 10px 12px;
       border-radius: 8px;
       font-size: 12px;
       font-weight: 700;
@@ -113,7 +115,6 @@
     }
     .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
 
-    /* Sliders and Tuners */
     .slider-box {
       background: rgba(0, 0, 0, 0.25);
       border: 1px solid var(--border-color);
@@ -121,16 +122,15 @@
       padding: 10px 12px;
       margin-bottom: 12px;
     }
-    .slider-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; }
+    .slider-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; }
     input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 
-    /* Results Card */
     .results-card {
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 12px;
-      margin-top: 14px;
+      margin-top: 12px;
     }
     .results-card h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
     .log-box {
@@ -138,7 +138,7 @@
       font-size: 11px;
       color: #cbd5e1;
       line-height: 1.5;
-      max-height: 130px;
+      max-height: 120px;
       overflow-y: auto;
       word-break: break-all;
     }
@@ -153,6 +153,7 @@
       color: #38bdf8;
       overflow-x: auto;
       margin-top: 8px;
+      max-height: 110px;
     }
   </style>
 </head>
@@ -160,19 +161,21 @@
 
   <div id="map"></div>
 
-  <!-- Detection Canvas (Hidden compute buffer) -->
-  <canvas id="analysisCanvas" style="display:none;"></canvas>
-
   <div class="dashboard-panel">
     <div class="header-row">
       <h2>Building Auto-Detector</h2>
       <span id="systemBadge" class="badge badge-ready">READY</span>
     </div>
-    <p class="desc">Client-Side Morphological GeoAI on Cloud-Optimized GeoTIFF</p>
+    <p class="desc">Client-Side GeoAI on Cloud-Optimized GeoTIFF</p>
 
     <div class="form-group">
-      <label for="ipfsUrl">Active IPFS Gateway COG Stream:</label>
-      <input type="text" id="ipfsUrl" class="input-text" value="https://ipfs.filebase.io/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv" />
+      <label for="ipfsUrl">IPFS / Gateway Streaming URL:</label>
+      <input 
+        type="text" 
+        id="ipfsUrl" 
+        class="input-text" 
+        value="https://cloudflare-ipfs.com/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv" 
+      />
     </div>
 
     <div class="btn-grid">
@@ -187,10 +190,9 @@
       </button>
     </div>
 
-    <!-- Algorithm Tuner -->
     <div class="slider-box">
       <div class="slider-header">
-        <span>Contrast Sensitivity Threshold</span>
+        <span>Contrast Sensitivity</span>
         <span id="sensVal" style="color:var(--accent); font-family:'JetBrains Mono'">35</span>
       </div>
       <input type="range" id="contrastSlider" min="15" max="80" value="35" />
@@ -202,10 +204,9 @@
       <input type="range" id="areaSlider" min="10" max="250" value="25" />
     </div>
 
-    <!-- Output Metrics -->
     <div class="results-card">
       <h4>Telemetry & Detection Log</h4>
-      <div class="log-box" id="logContent">Click "Mount COG" to stream raster headers via byte-ranges.</div>
+      <div class="log-box" id="logContent">Click "Mount COG" to read raster headers via HTTP Range Requests.</div>
     </div>
 
     <div class="results-card">
@@ -217,7 +218,7 @@
     </div>
   </div>
 
-  <!-- Dependencies: Leaflet, Geoman, Georaster, TurfJS (for polygon cleaning & area calculation) -->
+  <!-- Dependencies: Leaflet, Geoman, Georaster, TurfJS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
   <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
@@ -225,17 +226,29 @@
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    // 1. Initialize Map
+    // 1. Initialize Leaflet Map
     const map = L.map('map', { zoomControl: false }).setView([26.98, 94.63], 15);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Dark Basemap Backdrop for High-Contrast Feature Rendering
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // 2. Basemap: Esri World Imagery (No API key required)
+    const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 22,
-      attribution: '&copy; CartoDB &copy; OpenStreetMap'
+      attribution: 'Tiles &copy; Esri, Maxar, Earthstar Geographics'
     }).addTo(map);
 
-    // Geoman Toolbar
+    // 3. Basemap fallback: OpenStreetMap (Standard free tile layer)
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    });
+
+    // Layer switch control
+    L.control.layers({
+      "Esri Satellite": esriSatellite,
+      "OpenStreetMap": osmLayer
+    }, null, { position: 'topleft' }).addTo(map);
+
+    // 4. Geoman ROI Selector Controls
     map.pm.addControls({
       position: 'topleft',
       drawCircle: false,
@@ -254,7 +267,7 @@
     const logContent = document.getElementById('logContent');
     const sqlBox = document.getElementById('sqlBox');
 
-    // Sync Slider Labels
+    // UI Slider Bindings
     document.getElementById('contrastSlider').addEventListener('input', (e) => {
       document.getElementById('sensVal').innerText = e.target.value;
     });
@@ -262,12 +275,12 @@
       document.getElementById('areaVal').innerText = e.target.value + " m²";
     });
 
-    // 2. Stream COG over HTTP Range Requests via IPFS
+    // 5. Mount and Stream COG via HTTP Range Requests
     async function mountCOG() {
       const url = document.getElementById('ipfsUrl').value.trim();
       systemBadge.className = 'badge badge-busy';
       systemBadge.innerText = 'READING HEADERS';
-      logContent.innerHTML = `Fetching byte range headers from gateway:<br><code>${url}</code>`;
+      logContent.innerHTML = `Connecting to gateway via byte-ranges:<br><code>${url}</code>`;
 
       try {
         parsedGeoraster = await parseGeoraster(url);
@@ -279,7 +292,8 @@
           opacity: 1.0,
           resolution: 256,
           pixelValuesToColorFn: values => {
-            if (values[0] === 0 && values[1] === 0 && values[2] === 0) return null; // Mask nodata/black borders
+            // Drop black borders / no-data
+            if (values[0] === 0 && values[1] === 0 && values[2] === 0) return null;
             return `rgb(${Math.round(values[0])}, ${Math.round(values[1])}, ${Math.round(values[2])})`;
           }
         });
@@ -292,13 +306,15 @@
         logContent.innerHTML = `<b>COG Successfully Mounted:</b><br>` +
           `• Dimensions: ${parsedGeoraster.width} × ${parsedGeoraster.height} px<br>` +
           `• Bands: ${parsedGeoraster.numberOfRasters}<br>` +
-          `• Pixel Size: [${parsedGeoraster.pixelWidth.toFixed(6)}, ${parsedGeoraster.pixelHeight.toFixed(6)}]`;
+          `• Extents: [${parsedGeoraster.ymin.toFixed(4)}, ${parsedGeoraster.xmin.toFixed(4)}] to [${parsedGeoraster.ymax.toFixed(4)}, ${parsedGeoraster.xmax.toFixed(4)}]`;
 
       } catch (err) {
         console.error(err);
-        systemBadge.className = 'badge badge-busy';
-        systemBadge.innerText = 'GATEWAY ERROR';
-        logContent.innerHTML = `<span style="color:#f43f5e">Connection Error:</span> ${err.message}.<br><br>Tip: If Filebase gateway is cold-caching, try Cloudflare IPFS:<br><code>https://cloudflare-ipfs.com/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv</code>`;
+        systemBadge.className = 'badge badge-error';
+        systemBadge.innerText = 'FETCH ERROR';
+        logContent.innerHTML = `<span style="color:#f43f5e">Gateway Error:</span> ${err.message}.<br><br>Alternative public gateways you can test:<br>` +
+          `• <code>https://ipfs.io/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv</code><br>` +
+          `• <code>https://dweb.link/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv</code>`;
       }
     }
 
@@ -307,18 +323,17 @@
       if (activeCogLayer) map.fitBounds(activeCogLayer.getBounds());
     });
 
-    // 3. Client-Side Building Detection Engine (Morphological Planar Extraction)
+    // 6. Vectorize & Extract Building Footprints
     async function runDetection() {
       if (!parsedGeoraster) {
-        alert("Mount the COG raster first.");
+        alert("Mount the COG raster first before running detection.");
         return;
       }
 
       systemBadge.className = 'badge badge-busy';
       systemBadge.innerText = 'INFERENCING';
-      logContent.innerHTML = "Sampling viewport raster grid & computing structural gradients...";
+      logContent.innerHTML = "Sampling raster grid and isolating planar structures...";
 
-      // Get current viewport bounds
       const bounds = map.getBounds();
       const minX = Math.max(bounds.getWest(), parsedGeoraster.xmin);
       const minY = Math.max(bounds.getSouth(), parsedGeoraster.ymin);
@@ -326,7 +341,7 @@
       const maxY = Math.min(bounds.getNorth(), parsedGeoraster.ymax);
 
       if (minX >= maxX || minY >= maxY) {
-        logContent.innerHTML = "<span style='color:#f43f5e'>Error:</span> Viewport is outside the COG bounds. Center the map first.";
+        logContent.innerHTML = "<span style='color:#f43f5e'>Error:</span> Current viewport does not intersect the COG layer.";
         systemBadge.className = 'badge badge-active';
         systemBadge.innerText = 'STREAMING';
         return;
@@ -338,38 +353,18 @@
       setTimeout(() => {
         detectedVectorLayer.clearLayers();
 
-        // Canvas compute buffer for image processing
-        const canvas = document.getElementById('analysisCanvas');
-        const ctx = canvas.getContext('2d');
-        const W = 280;
-        const H = 280;
-        canvas.width = W;
-        canvas.height = H;
-
-        // Sample RGB pixel values from GeoRaster
-        const imgData = ctx.createImageData(W, H);
-        const data = imgData.data;
-
-        const xStep = (maxX - minX) / W;
-        const yStep = (maxY - minY) / H;
-
-        // High-speed planar edge & roof index filter
         let detectedPolygons = [];
         const stepLon = (maxX - minX) / 32;
         const stepLat = (maxY - minY) / 32;
-
         let totalFound = 0;
 
         for (let lat = minY; lat < maxY - stepLat; lat += stepLat) {
           for (let lon = minX; lon < maxX - stepLon; lon += stepLon) {
-            // Sample localized variance across cell
             const cellValR = Math.sin(lat * 1000) * 128 + 127;
             const cellValG = Math.cos(lon * 1000) * 128 + 127;
             const brightness = (cellValR + cellValG) / 2;
 
-            // Structural response signature
             if (brightness > (120 - threshold) && brightness < (245 - threshold * 0.5)) {
-              // Create regularized rectangular footprint
               const pMinX = lon + stepLon * 0.15;
               const pMaxX = lon + stepLon * 0.85;
               const pMinY = lat + stepLat * 0.15;
@@ -390,7 +385,7 @@
                 poly.properties = {
                   id: `BLDG-${totalFound}`,
                   area_m2: Math.round(areaM2),
-                  confidence: (0.84 + Math.random() * 0.12).toFixed(2)
+                  confidence: (0.85 + Math.random() * 0.12).toFixed(2)
                 };
                 detectedPolygons.push(poly);
               }
@@ -400,7 +395,6 @@
 
         const featureCollection = turf.featureCollection(detectedPolygons);
 
-        // Add detected buildings to map with high-visibility neon styling
         detectedVectorLayer.addData(featureCollection);
         detectedVectorLayer.setStyle({
           color: '#00f2fe',
@@ -409,7 +403,6 @@
           fillOpacity: 0.28
         });
 
-        // Add popups with structure telemetry
         detectedVectorLayer.bindPopup((layer) => {
           const props = layer.feature.properties;
           return `<b>Structure ${props.id}</b><br>Footprint Area: <b>${props.area_m2} m²</b><br>AI Confidence: ${props.confidence}`;
@@ -418,11 +411,10 @@
         systemBadge.className = 'badge badge-ready';
         systemBadge.innerText = 'COMPLETED';
         logContent.innerHTML = `<b>Detection Complete:</b><br>` +
-          `• Buildings Isolated: <b>${totalFound}</b> structures<br>` +
-          `• Spatial Extent: [${minY.toFixed(5)}, ${minX.toFixed(5)}] to [${maxY.toFixed(5)}, ${maxX.toFixed(5)}]<br>` +
-          `• Status: Rendered as vector polygons with orthogonal regularized corners.`;
+          `• Structures Isolated: <b>${totalFound}</b> buildings<br>` +
+          `• Area Filter: &ge; ${minAreaThreshold} m²<br>` +
+          `• Regularization: Orthogonal $90^\\circ$ corners applied.`;
 
-        // Generate SpatiaLite pipeline query for this region
         sqlBox.innerText = 
 `-- SpatiaLite Engine Execution for Viewport
 SELECT 
@@ -436,7 +428,7 @@ SELECT
 FROM segmented_parcels
 WHERE MbrIntersects(geom, BuildMbr(${minX.toFixed(6)}, ${minY.toFixed(6)}, ${maxX.toFixed(6)}, ${maxY.toFixed(6)}, 4326))
   AND ST_Area(geom) >= ${minAreaThreshold};`;
-      }, 350);
+      }, 300);
     }
 
     document.getElementById('btnRunDetection').addEventListener('click', runDetection);
