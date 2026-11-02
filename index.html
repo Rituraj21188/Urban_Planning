@@ -15,8 +15,11 @@
   <!-- PMTiles Protocol v3 -->
   <script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
 
-  <!-- Three.js for 3D Geospatial Layer -->
+  <!-- Three.js for 3D Layer -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Proj4js for UTM -> WGS84 Geo-reprojection -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
 
   <!-- Loaders.gl for in-browser LAZ decompression -->
   <script src="https://unpkg.com/@loaders.gl/core@3.4.4/dist/dist.min.js"></script>
@@ -47,10 +50,10 @@
   <!-- Top Status Badge -->
   <header class="absolute top-4 left-4 z-20 flex items-center gap-3">
     <div class="glass-hud px-4 py-2.5 rounded-xl flex items-center gap-3">
-      <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
       <span class="font-bold tracking-wide text-xs uppercase text-sky-400">Urban Twin Platform</span>
       <div class="h-4 w-px bg-slate-700"></div>
-      <span id="status-text" class="text-xs text-slate-300">Ready</span>
+      <span id="status-text" class="text-xs text-slate-300">Initializing Twin...</span>
     </div>
   </header>
 
@@ -111,12 +114,10 @@
         <span class="text-slate-200 font-medium flex items-center gap-1.5">
           <i class="fa-solid fa-cubes-stacked text-purple-400"></i> 3D Point Cloud
         </span>
-        <button id="btn-load-pcd" class="px-2.5 py-1 rounded bg-purple-600/80 hover:bg-purple-500 text-[11px] font-semibold text-white transition">
-          Load LAZ
-        </button>
+        <input type="checkbox" id="toggle-pcd" checked class="accent-purple-400 w-4 h-4 cursor-pointer" />
       </div>
 
-      <div id="pcd-controls" class="space-y-3 opacity-50 pointer-events-none transition-opacity">
+      <div id="pcd-controls" class="space-y-3">
         <div class="flex items-center justify-between">
           <span class="text-slate-400 text-[11px]">Color Mode</span>
           <div class="inline-flex rounded-lg border border-slate-700 bg-slate-800/80 p-0.5">
@@ -128,9 +129,9 @@
         <div class="space-y-1">
           <div class="flex justify-between text-slate-400 text-[11px]">
             <span>Point Size</span>
-            <span id="label-pt-size" class="text-purple-300 font-mono">2.0 px</span>
+            <span id="label-pt-size" class="text-purple-300 font-mono">3.5 px</span>
           </div>
-          <input type="range" id="slider-pt-size" min="1" max="8" step="0.5" value="2.0" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+          <input type="range" id="slider-pt-size" min="1" max="10" step="0.5" value="3.5" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
         </div>
 
         <div class="space-y-1">
@@ -138,7 +139,7 @@
             <span>Vertical Lift (Z-Offset)</span>
             <span id="label-z-offset" class="text-purple-300 font-mono">0.0 m</span>
           </div>
-          <input type="range" id="slider-z-offset" min="-20" max="50" step="1" value="0" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+          <input type="range" id="slider-z-offset" min="-30" max="60" step="1" value="0" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
         </div>
       </div>
     </div>
@@ -150,24 +151,27 @@
     </div>
   </aside>
 
-  <!-- Progress Bar Overlay for LAZ Loading -->
-  <div id="pcd-progress" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-30 glass-hud px-4 py-2.5 rounded-xl flex items-center gap-3 text-xs shadow-2xl">
+  <!-- Progress Bar Overlay for Initial Load -->
+  <div id="pcd-progress" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 glass-hud px-4 py-2.5 rounded-xl flex items-center gap-3 text-xs shadow-2xl">
     <i class="fa-solid fa-circle-notch fa-spin text-purple-400"></i>
-    <span id="pcd-progress-text" class="text-slate-200">Streaming Urban_Plan_Compressed.laz...</span>
+    <span id="pcd-progress-text" class="text-slate-200">Loading Ortho & 3D Point Cloud...</span>
   </div>
 
   <script>
     // =========================================================================
-    // 1. URLs and PMTiles Protocol Setup
+    // 1. Files & PMTiles Setup
     // =========================================================================
     const PMTILES_URL = new URL("Urban_City_Ortho.pmtiles", window.location.href).href;
     const LAZ_URL = new URL("Urban_Plan_Compressed.laz", window.location.href).href;
 
     let removeBlackBorder = true;
     let orthoBounds = null;
-    let sceneCenterLngLat = [91.70, 26.15];
+    let sceneCenterLngLat = [91.70, 26.15]; // Default region
 
-    // Off-screen canvas for real-time black collar removal
+    // Setup UTM Zone 46N (Assam / NE India) projection definition
+    proj4.defs("EPSG:32646", "+proj=utm +zone=46 +datum=WGS84 +units=m +no_defs");
+
+    // Canvas for real-time black collar removal
     const tileCanvas = document.createElement('canvas');
     tileCanvas.width = 256;
     tileCanvas.height = 256;
@@ -189,11 +193,11 @@
               const imgData = ctx.getImageData(0, 0, 256, 256);
               const data = imgData.data;
 
-              // Converts near-black compression boundary artifacts into 100% transparent pixels
+              // Transparent alpha filter for black margins
               for (let i = 0; i < data.length; i += 4) {
                 const r = data[i], g = data[i + 1], b = data[i + 2];
                 if (r < 32 && g < 32 && b < 32 && Math.abs(r - g) <= 12 && Math.abs(g - b) <= 12) {
-                  data[i + 3] = 0; // Alpha = 0
+                  data[i + 3] = 0;
                 }
               }
 
@@ -239,8 +243,8 @@
         ]
       },
       center: sceneCenterLngLat,
-      zoom: 15,
-      pitch: 42,
+      zoom: 15.5,
+      pitch: 52,
       bearing: -15,
       antialias: true
     });
@@ -248,19 +252,198 @@
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
+    // =========================================================================
+    // 3. Three.js Custom 3D Layer for LAZ Points
+    // =========================================================================
+    let pointCloudMesh = null;
+    let rawColorsRGB = null;
+    let elevationColors = null;
+    let currentZOffset = 0;
+
+    const custom3DLayer = {
+      id: 'point-cloud-3d-layer',
+      type: 'custom',
+      renderingMode: '3d',
+      onAdd: function (mapInstance, gl) {
+        this.camera = new THREE.Camera();
+        this.scene = new THREE.Scene();
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: mapInstance.getCanvas(),
+          context: gl,
+          antialias: true
+        });
+        this.renderer.autoClear = false;
+      },
+      render: function (gl, matrix) {
+        if (!pointCloudMesh) return;
+
+        // Origin reference in Mercator space
+        const mercatorOrigin = maplibregl.MercatorCoordinate.fromLngLat(
+          sceneCenterLngLat,
+          currentZOffset
+        );
+        const meterScale = mercatorOrigin.meterInMercatorCoordinateType();
+
+        // Transform world coordinates into MapLibre GL space
+        const transform = new THREE.Matrix4()
+          .makeTranslation(mercatorOrigin.x, mercatorOrigin.y, mercatorOrigin.z)
+          .scale(new THREE.Vector3(meterScale, -meterScale, meterScale));
+
+        const m = new THREE.Matrix4().fromArray(matrix);
+        this.camera.projectionMatrix = m.multiply(transform);
+
+        this.renderer.resetState();
+        gl.disable(gl.DEPTH_TEST); // Ensures point cloud renders crisply over the OSM map
+        this.renderer.render(this.scene, this.camera);
+        gl.enable(gl.DEPTH_TEST);
+      }
+    };
+
+    // =========================================================================
+    // 4. Auto-Load Point Cloud on Startup
+    // =========================================================================
+    async function initPointCloud() {
+      const prog = document.getElementById('pcd-progress');
+      const progText = document.getElementById('pcd-progress-text');
+
+      try {
+        progText.innerText = "Downloading Urban_Plan_Compressed.laz (Initial Load)...";
+        const response = await fetch(LAZ_URL);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const arrayBuffer = await response.arrayBuffer();
+
+        progText.innerText = "Parsing points & projecting UTM coordinates...";
+        const data = await loaders.load(arrayBuffer, loaders.LASLoader);
+
+        const pos = data.attributes.POSITION.value;
+        const count = pos.length / 3;
+
+        // Step = 2 ensures high density while guaranteeing smooth 60 FPS in WebGL
+        const step = count > 3000000 ? 2 : 1;
+        const validCount = Math.floor(count / step);
+
+        const localPositions = new Float32Array(validCount * 3);
+        const colorsRGB = new Float32Array(validCount * 3);
+        const colorsElev = new Float32Array(validCount * 3);
+
+        const colorAttr = data.attributes.COLOR_0 ? data.attributes.COLOR_0.value : null;
+
+        // Check whether coordinates are UTM meters (> 1000) or Geographic (< 180)
+        const isUTM = Math.abs(pos[0]) > 1000 || Math.abs(pos[1]) > 1000;
+
+        // Determine center coordinate
+        let sampleX = pos[0], sampleY = pos[1];
+        if (isUTM) {
+          const [lon, lat] = proj4("EPSG:32646", "EPSG:4326", [sampleX, sampleY]);
+          sceneCenterLngLat = [lon, lat];
+        } else {
+          sceneCenterLngLat = [sampleX, sampleY];
+        }
+
+        // Project center to UTM for metric offset calculations
+        const centerUTM = isUTM ? [pos[0], pos[1]] : proj4("EPSG:4326", "EPSG:32646", sceneCenterLngLat);
+
+        let minZ = Infinity, maxZ = -Infinity;
+        let dst = 0;
+
+        for (let i = 0; i < count; i += step) {
+          const x = pos[i * 3];
+          const y = pos[i * 3 + 1];
+          const z = pos[i * 3 + 2];
+
+          if (z < minZ) minZ = z;
+          if (z > maxZ) maxZ = z;
+
+          // Compute metric offset relative to center in meters
+          if (isUTM) {
+            localPositions[dst * 3] = x - centerUTM[0];
+            localPositions[dst * 3 + 1] = y - centerUTM[1];
+          } else {
+            const utmPt = proj4("EPSG:4326", "EPSG:32646", [x, y]);
+            localPositions[dst * 3] = utmPt[0] - centerUTM[0];
+            localPositions[dst * 3 + 1] = utmPt[1] - centerUTM[1];
+          }
+          localPositions[dst * 3 + 2] = z;
+
+          // Colors
+          if (colorAttr) {
+            colorsRGB[dst * 3] = colorAttr[i * 4] / 255.0;
+            colorsRGB[dst * 3 + 1] = colorAttr[i * 4 + 1] / 255.0;
+            colorsRGB[dst * 3 + 2] = colorAttr[i * 4 + 2] / 255.0;
+          } else {
+            colorsRGB[dst * 3] = 0.2;
+            colorsRGB[dst * 3 + 1] = 0.8;
+            colorsRGB[dst * 3 + 2] = 0.9;
+          }
+          dst++;
+        }
+
+        // Elevation heat ramp
+        const rangeZ = maxZ - minZ || 1.0;
+        for (let i = 0; i < validCount; i++) {
+          const normZ = (localPositions[i * 3 + 2] - minZ) / rangeZ;
+          colorsElev[i * 3] = Math.min(1.0, normZ * 1.6);
+          colorsElev[i * 3 + 1] = Math.max(0.1, 1.0 - Math.abs(normZ - 0.5) * 2);
+          colorsElev[i * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.6);
+        }
+
+        rawColorsRGB = colorsRGB;
+        elevationColors = colorsElev;
+
+        // Build Geometry
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(localPositions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colorsRGB, 3));
+
+        const material = new THREE.PointsMaterial({
+          size: 3.5,
+          vertexColors: true,
+          sizeAttenuation: true,
+          transparent: true,
+          opacity: 0.95
+        });
+
+        pointCloudMesh = new THREE.Points(geometry, material);
+        custom3DLayer.scene.add(pointCloudMesh);
+
+        if (!map.getLayer('point-cloud-3d-layer')) {
+          map.addLayer(custom3DLayer);
+        }
+
+        document.getElementById('status-dot').className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+        document.getElementById('status-text').innerText = `Active: ${validCount.toLocaleString()} pts`;
+        prog.classList.add('hidden');
+
+        // Center camera precisely over the point cloud
+        map.flyTo({
+          center: sceneCenterLngLat,
+          zoom: 16.5,
+          pitch: 55,
+          duration: 2000
+        });
+
+        map.triggerRepaint();
+
+      } catch (err) {
+        console.error("Point cloud load error:", err);
+        progText.innerText = "Error decoding point cloud file.";
+        setTimeout(() => prog.classList.add('hidden'), 4000);
+      }
+    }
+
+    // =========================================================================
+    // 5. Map Load & Controls
+    // =========================================================================
     map.on('load', async () => {
+      // 1. Load Orthomosaic
       try {
         const header = await p.getHeader();
         orthoBounds = [
           [header.minLon, header.minLat],
           [header.maxLon, header.maxLat]
         ];
-        sceneCenterLngLat = [
-          (header.minLon + header.maxLon) / 2,
-          (header.minLat + header.maxLat) / 2
-        ];
 
-        // Register Orthomosaic PMTiles Source
         map.addSource('local-ortho-source', {
           type: 'raster',
           url: `pmtiles://${PMTILES_URL}`,
@@ -273,220 +456,25 @@
           source: 'local-ortho-source',
           paint: {
             'raster-opacity': 1.0,
-            'raster-brightness-max': 0.75, // +25% boost
+            'raster-brightness-max': 0.75,
             'raster-contrast': 0.20,
             'raster-fade-duration': 0
           }
         });
-
-        // Recenter to drone extent
-        map.fitBounds(orthoBounds, { padding: 40, duration: 1500 });
-        document.getElementById('status-text').innerText = "Ortho Active";
       } catch (err) {
-        console.error("Failed to load PMTiles header:", err);
+        console.warn("Ortho load note:", err);
       }
+
+      // 2. Automatically load 3D Point Cloud on startup
+      initPointCloud();
     });
 
-    // =========================================================================
-    // 3. Three.js Custom 3D Layer for LAZ Point Cloud
-    // =========================================================================
-    let pointCloudMesh = null;
-    let rawPositions = null;
-    let rawColorsRGB = null;
-    let elevationColors = null;
-    let pcdColorMode = 'rgb';
-    let currentZOffset = 0;
-
-    const custom3DLayer = {
-      id: 'point-cloud-3d-layer',
-      type: 'custom',
-      renderingMode: '3d',
-      onAdd: function (mapInstance, gl) {
-        this.camera = new THREE.Camera();
-        this.scene = new THREE.Scene();
-
-        const light = new THREE.DirectionalLight(0xffffff, 1.0);
-        light.position.set(0, -70, 100).normalize();
-        this.scene.add(light);
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-
-        this.renderer = new THREE.WebGLRenderer({
-          canvas: mapInstance.getCanvas(),
-          context: gl,
-          antialias: true
-        });
-        this.renderer.autoClear = false;
-      },
-      render: function (gl, matrix) {
-        if (!pointCloudMesh) return;
-
-        const mercator = maplibregl.MercatorCoordinate.fromLngLat(
-          sceneCenterLngLat,
-          currentZOffset
-        );
-        const meterScale = mercator.meterInMercatorCoordinateType();
-
-        const transform = new THREE.Matrix4()
-          .makeTranslation(mercator.x, mercator.y, mercator.z)
-          .scale(new THREE.Vector3(meterScale, -meterScale, meterScale));
-
-        const m = new THREE.Matrix4().fromArray(matrix);
-        this.camera.projectionMatrix = m.multiply(transform);
-
-        this.renderer.resetState();
-        this.renderer.render(this.scene, this.camera);
-        map.triggerRepaint();
-      }
-    };
-
-    // Load & Parse LAZ on demand
-    async function loadLAZPointCloud() {
-      const prog = document.getElementById('pcd-progress');
-      const progText = document.getElementById('pcd-progress-text');
-      prog.classList.remove('hidden');
-      progText.innerText = "Streaming Urban_Plan_Compressed.laz from repository...";
-
-      try {
-        const response = await fetch(LAZ_URL);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const arrayBuffer = await response.arrayBuffer();
-
-        progText.innerText = "Decompressing 3D point cloud with loaders.gl...";
-        const data = await loaders.load(arrayBuffer, loaders.LASLoader);
-
-        const pos = data.attributes.POSITION.value;
-        const count = pos.length / 3;
-
-        // Subsample for optimal 60 FPS performance if point count exceeds 2.5M
-        const step = count > 2500000 ? 2 : 1;
-        const validCount = Math.floor(count / step);
-
-        const filteredPos = new Float32Array(validCount * 3);
-        const filteredRgb = new Float32Array(validCount * 3);
-        const filteredElev = new Float32Array(validCount * 3);
-
-        const colorAttr = data.attributes.COLOR_0 ? data.attributes.COLOR_0.value : null;
-
-        // Compute mean center for local precision
-        let meanX = 0, meanY = 0, meanZ = 0;
-        for (let i = 0; i < count; i += step) {
-          meanX += pos[i * 3];
-          meanY += pos[i * 3 + 1];
-          meanZ += pos[i * 3 + 2];
-        }
-        meanX /= validCount;
-        meanY /= validCount;
-        meanZ /= validCount;
-
-        let minZ = Infinity, maxZ = -Infinity;
-        let dst = 0;
-        for (let i = 0; i < count; i += step) {
-          const z = pos[i * 3 + 2];
-          if (z < minZ) minZ = z;
-          if (z > maxZ) maxZ = z;
-
-          // Local coordinates centered around origin
-          filteredPos[dst * 3] = pos[i * 3] - meanX;
-          filteredPos[dst * 3 + 1] = pos[i * 3 + 1] - meanY;
-          filteredPos[dst * 3 + 2] = z - meanZ;
-
-          // RGB Colors
-          if (colorAttr) {
-            filteredRgb[dst * 3] = colorAttr[i * 4] / 255.0;
-            filteredRgb[dst * 3 + 1] = colorAttr[i * 4 + 1] / 255.0;
-            filteredRgb[dst * 3 + 2] = colorAttr[i * 4 + 2] / 255.0;
-          } else {
-            filteredRgb[dst * 3] = 0.2;
-            filteredRgb[dst * 3 + 1] = 0.8;
-            filteredRgb[dst * 3 + 2] = 0.9;
-          }
-          dst++;
-        }
-
-        // Generate Elevation Ramps
-        const rangeZ = maxZ - minZ || 1.0;
-        for (let i = 0; i < validCount; i++) {
-          const normZ = (filteredPos[i * 3 + 2] + meanZ - minZ) / rangeZ;
-          filteredElev[i * 3] = Math.min(1.0, normZ * 1.5);
-          filteredElev[i * 3 + 1] = Math.max(0.1, 1.0 - Math.abs(normZ - 0.5) * 2);
-          filteredElev[i * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.5);
-        }
-
-        rawPositions = filteredPos;
-        rawColorsRGB = filteredRgb;
-        elevationColors = filteredElev;
-
-        // Build Geometry
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(filteredPos, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(filteredRgb, 3));
-
-        const material = new THREE.PointsMaterial({
-          size: 2.0,
-          vertexColors: true,
-          sizeAttenuation: true
-        });
-
-        pointCloudMesh = new THREE.Points(geometry, material);
-
-        if (!map.getLayer('point-cloud-3d-layer')) {
-          map.addLayer(custom3DLayer);
-        }
-
-        // Enable UI Controls
-        document.getElementById('pcd-controls').classList.remove('opacity-50', 'pointer-events-none');
-        document.getElementById('btn-load-pcd').innerText = "Loaded";
-        document.getElementById('btn-load-pcd').classList.replace('bg-purple-600/80', 'bg-emerald-600/80');
-        prog.classList.add('hidden');
-        document.getElementById('status-text').innerText = `3D Active: ${validCount.toLocaleString()} pts`;
-        map.triggerRepaint();
-
-      } catch (err) {
-        console.error("Error decoding LAZ:", err);
-        progText.innerText = "Failed to load LAZ file from GitHub.";
-        setTimeout(() => prog.classList.add('hidden'), 3500);
-      }
-    }
-
-    // =========================================================================
-    // 4. UI Handlers
-    // =========================================================================
-    document.getElementById('btn-load-pcd').addEventListener('click', loadLAZPointCloud);
-
-    document.getElementById('slider-pt-size').addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      document.getElementById('label-pt-size').innerText = `${val.toFixed(1)} px`;
-      if (pointCloudMesh) {
-        pointCloudMesh.material.size = val;
-        map.triggerRepaint();
-      }
+    // Recenter
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+      map.flyTo({ center: sceneCenterLngLat, zoom: 16.5, pitch: 55, duration: 1500 });
     });
 
-    document.getElementById('slider-z-offset').addEventListener('input', (e) => {
-      currentZOffset = parseFloat(e.target.value);
-      document.getElementById('label-z-offset').innerText = `${currentZOffset.toFixed(1)} m`;
-      map.triggerRepaint();
-    });
-
-    document.getElementById('btn-color-rgb').addEventListener('click', () => {
-      if (!pointCloudMesh || !rawColorsRGB) return;
-      pointCloudMesh.geometry.setAttribute('color', new THREE.BufferAttribute(rawColorsRGB, 3));
-      pointCloudMesh.geometry.attributes.color.needsUpdate = true;
-      document.getElementById('btn-color-rgb').className = "px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-medium";
-      document.getElementById('btn-color-elevation').className = "px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 font-medium";
-      map.triggerRepaint();
-    });
-
-    document.getElementById('btn-color-elevation').addEventListener('click', () => {
-      if (!pointCloudMesh || !elevationColors) return;
-      pointCloudMesh.geometry.setAttribute('color', new THREE.BufferAttribute(elevationColors, 3));
-      pointCloudMesh.geometry.attributes.color.needsUpdate = true;
-      document.getElementById('btn-color-elevation').className = "px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-medium";
-      document.getElementById('btn-color-rgb').className = "px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 font-medium";
-      map.triggerRepaint();
-    });
-
-    // Ortho controls
+    // Ortho Toggles
     document.getElementById('toggle-ortho').addEventListener('change', (e) => {
       if (map.getLayer('local-ortho-layer')) {
         map.setLayoutProperty('local-ortho-layer', 'visibility', e.target.checked ? 'visible' : 'none');
@@ -527,8 +515,45 @@
       if (map.getLayer('local-ortho-layer')) map.setPaintProperty('local-ortho-layer', 'raster-contrast', val / 100);
     });
 
-    document.getElementById('btn-recenter').addEventListener('click', () => {
-      if (orthoBounds) map.fitBounds(orthoBounds, { padding: 40, duration: 1500 });
+    // Point Cloud UI
+    document.getElementById('toggle-pcd').addEventListener('change', (e) => {
+      if (pointCloudMesh) {
+        pointCloudMesh.visible = e.target.checked;
+        map.triggerRepaint();
+      }
+    });
+
+    document.getElementById('slider-pt-size').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      document.getElementById('label-pt-size').innerText = `${val.toFixed(1)} px`;
+      if (pointCloudMesh) {
+        pointCloudMesh.material.size = val;
+        map.triggerRepaint();
+      }
+    });
+
+    document.getElementById('slider-z-offset').addEventListener('input', (e) => {
+      currentZOffset = parseFloat(e.target.value);
+      document.getElementById('label-z-offset').innerText = `${currentZOffset.toFixed(1)} m`;
+      map.triggerRepaint();
+    });
+
+    document.getElementById('btn-color-rgb').addEventListener('click', () => {
+      if (!pointCloudMesh || !rawColorsRGB) return;
+      pointCloudMesh.geometry.setAttribute('color', new THREE.BufferAttribute(rawColorsRGB, 3));
+      pointCloudMesh.geometry.attributes.color.needsUpdate = true;
+      document.getElementById('btn-color-rgb').className = "px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-medium";
+      document.getElementById('btn-color-elevation').className = "px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 font-medium";
+      map.triggerRepaint();
+    });
+
+    document.getElementById('btn-color-elevation').addEventListener('click', () => {
+      if (!pointCloudMesh || !elevationColors) return;
+      pointCloudMesh.geometry.setAttribute('color', new THREE.BufferAttribute(elevationColors, 3));
+      pointCloudMesh.geometry.attributes.color.needsUpdate = true;
+      document.getElementById('btn-color-elevation').className = "px-2 py-0.5 rounded text-[10px] bg-purple-500/20 text-purple-300 font-medium";
+      document.getElementById('btn-color-rgb').className = "px-2 py-0.5 rounded text-[10px] text-slate-400 hover:text-slate-200 font-medium";
+      map.triggerRepaint();
     });
   </script>
 </body>
