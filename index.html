@@ -12,6 +12,9 @@
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 
+  <!-- Protomaps PMTiles JS Protocol -->
+  <script src="https://unpkg.com/pmtiles@2.11.0/dist/index.js"></script>
+
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
@@ -27,7 +30,7 @@
 
     /* Glassmorphism styling */
     .glass-hud {
-      background: rgba(15, 23, 42, 0.82);
+      background: rgba(15, 23, 42, 0.85);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -102,15 +105,15 @@
         </button>
       </div>
 
-      <!-- Raster Layer Toggles (COG) -->
+      <!-- Raster Layer Toggles -->
       <div class="space-y-2.5">
-        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Raster Stream (IPFS COG)</span>
+        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Raster Stream (IPFS PMTiles)</span>
         
-        <!-- Ortho COG Toggle -->
+        <!-- Ortho PMTiles Toggle -->
         <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs">
             <span class="flex items-center gap-2 text-slate-200">
-              <i class="fa-solid fa-map text-emerald-400"></i> Urban Ortho COG
+              <i class="fa-solid fa-map text-emerald-400"></i> Urban Ortho PMTiles
             </span>
             <input type="checkbox" id="toggle-ortho" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
           </div>
@@ -217,15 +220,20 @@
 
   <script>
     // =========================================================================
-    // 1. IPFS CIDs & TiTiler Configuration
+    // 1. Register Protomaps PMTiles Protocol with MapLibre GL
+    // =========================================================================
+    const protocol = new pmtiles.Protocol();
+    maplibregl.addProtocol("pmtiles", protocol.tile);
+
+    // =========================================================================
+    // 2. IPFS CIDs & Configuration
     // =========================================================================
     const CIDS = {
-      urbanOrthoCOG: "QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv",
+      urbanOrthoPMTiles: "QmYj94MMzKfteQQhahtVbJKcVpDkZV1U5hkW9VisQif7dK",
       dsmCOG: "QmXjtD6EZZZcUdMFxV2QWWkBbgPp28kxscyF6mj2FYRkm5",
       dtmCOG: "QmfTFvWRHCurht3491seVBa5eGZ2utjCJP43usoJpTmRHN",
       buildingsWithHeights: "QmPtpP7bxxF1FTMy8vjwycSwRE69jaVC231seodtjD4SYd",
       buildingsFootprints: "QmPNJGorZ2XKUXuAem494duSfsLBQED79jW6abDNLivqSu",
-      buildingsMask: "QmPiaAkh3zoveViB4ofemprm7y4ESpHSe1ZN6G2r5ndjWq",
       buildingsRaw: "QmcvdyAXAAdAZcvrsRR4kFJrKyCK1kTw85vwSXg3GLfM1R"
     };
 
@@ -235,7 +243,7 @@
     let buildingsGeojsonData = null;
 
     // =========================================================================
-    // 2. MapLibre GL JS Initialization
+    // 3. MapLibre GL JS Initialization
     // =========================================================================
     const map = new maplibregl.Map({
       container: 'map',
@@ -262,19 +270,18 @@
           }
         ]
       },
-      center: [0, 0], // Replaced automatically on GeoJSON fetch
-      zoom: 2,
+      center: [91.647, 26.168], // Regional center, automatically adjusted on load
+      zoom: 15,
       pitch: 58,
       bearing: -20,
       antialias: true
     });
 
-    // Navigation and pitch controls
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
 
     // =========================================================================
-    // 3. Dynamic IPFS & COG Layer Management
+    // 4. IPFS URL Resolvers
     // =========================================================================
     function getIpfsUrl(cid) {
       return `${activeGateway}/${cid}`;
@@ -312,30 +319,37 @@
       }
     }
 
-    // Refresh raster COG tile layers
+    // =========================================================================
+    // 5. PMTiles & Elevation Layer Management
+    // =========================================================================
     function reloadRasterLayers() {
-      // 1. Urban Ortho COG
-      if (map.getSource('ortho-cog-source')) {
-        if (map.getLayer('ortho-cog-layer')) map.removeLayer('ortho-cog-layer');
-        map.removeSource('ortho-cog-source');
+      const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
+
+      // 1. PMTiles Drone Orthomosaic Raster Stream
+      if (map.getSource('ortho-pmtiles-source')) {
+        if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
+        map.removeSource('ortho-pmtiles-source');
       }
 
-      map.addSource('ortho-cog-source', {
+      const pmtilesUrl = `pmtiles://${getIpfsUrl(CIDS.urbanOrthoPMTiles)}`;
+
+      map.addSource('ortho-pmtiles-source', {
         type: 'raster',
-        tiles: [getTiTilerUrl(CIDS.urbanOrthoCOG)],
+        url: pmtilesUrl,
         tileSize: 256
       });
 
       map.addLayer({
-        id: 'ortho-cog-layer',
+        id: 'ortho-pmtiles-layer',
         type: 'raster',
-        source: 'ortho-cog-source',
+        source: 'ortho-pmtiles-source',
         paint: {
-          'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100
+          'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
+          'raster-fade-duration': 150
         }
-      }, 'buildings-extruded'); // Insert under 3D buildings
+      }, beforeLayerId);
 
-      // 2. Elevation COG (DSM/DTM)
+      // 2. Elevation Raster Overlay (DSM/DTM via TiTiler)
       const isElevActive = document.getElementById('toggle-elevation').checked;
       const elevMode = document.querySelector('input[name="elev-mode"]:checked').value;
       const elevCid = elevMode === 'dsm' ? CIDS.dsmCOG : CIDS.dtmCOG;
@@ -359,12 +373,12 @@
           paint: {
             'raster-opacity': 0.75
           }
-        }, 'buildings-extruded');
+        }, beforeLayerId);
       }
     }
 
     // =========================================================================
-    // 4. Fetch & Extrude GeoJSON Buildings with Heights
+    // 6. Fetch & Extrude GeoJSON Buildings with Heights
     // =========================================================================
     async function loadBuildingFootprints() {
       setLoading(true, "Downloading building vectors from IPFS...");
@@ -387,11 +401,11 @@
 
       if (!loaded || !buildingsGeojsonData || !buildingsGeojsonData.features) {
         setLoading(false);
-        showToast("Gateway timeout or CORS restriction on current IPFS node. Switch gateways above.", true);
+        showToast("Gateway timeout on vector GeoJSON. Try switching gateways.", true);
         return;
       }
 
-      // Compute bounding box and building statistics
+      // Compute bounds and stats
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       let count = 0, totalH = 0, maxH = 0;
 
@@ -399,7 +413,6 @@
         if (!feat.id) feat.id = index + 1;
         const props = feat.properties || {};
         
-        // Resolve height fields
         const hMax = Number(props.h_max ?? props.max_height ?? props.height ?? 3.5);
         const hMean = Number(props.h_mean ?? props.mean_height ?? props.avg_height ?? (hMax * 0.85));
         
@@ -410,7 +423,6 @@
         totalH += props._calc_h_mean;
         if (props._calc_h_max > maxH) maxH = props._calc_h_max;
 
-        // Traverse geometry to get map bounds
         const scanCoords = (coords) => {
           if (typeof coords[0] === 'number') {
             const [lng, lat] = coords;
@@ -427,12 +439,11 @@
         }
       });
 
-      // Update HUD metrics
+      // Update HUD stats
       document.getElementById('stat-count').innerText = count.toLocaleString();
       document.getElementById('stat-max').innerText = `${maxH.toFixed(1)} m`;
       document.getElementById('stat-avg').innerText = count > 0 ? `${(totalH / count).toFixed(1)} m` : '--';
 
-      // Update or Add GeoJSON Source
       if (map.getSource('buildings-source')) {
         map.getSource('buildings-source').setData(buildingsGeojsonData);
       } else {
@@ -459,7 +470,7 @@
           }
         });
 
-        // 2D Outline Border for crisp rendering
+        // 2D Crisp Outline Border
         map.addLayer({
           id: 'buildings-outline',
           type: 'line',
@@ -472,7 +483,7 @@
         });
       }
 
-      // Fly camera directly to the urban boundary
+      // Fly to bounds
       if (minX !== Infinity && minY !== Infinity) {
         map.fitBounds([[minX, minY], [maxX, maxY]], {
           padding: 60,
@@ -491,7 +502,6 @@
       if (buildingColorMode === 'mono') {
         return '#cbd5e1';
       }
-      // Height-based heat gradient (Cool Cyan -> Lime -> Amber -> Coral Red)
       return [
         'interpolate',
         ['linear'],
@@ -514,7 +524,7 @@
     }
 
     // =========================================================================
-    // 5. User Interaction & Event Listeners
+    // 7. Event Listeners & Controls
     // =========================================================================
     map.on('load', () => {
       reloadRasterLayers();
@@ -530,12 +540,10 @@
         const hMean = Number(props._calc_h_mean || props.h_mean || 0).toFixed(2);
         const fid = feat.id || props.fid || 'Structure';
 
-        // Update inspector sidebar
         document.getElementById('inspect-id').innerText = `ID #${fid}`;
         document.getElementById('inspect-hmax').innerText = `${hMax} m`;
         document.getElementById('inspect-hmean').innerText = `${hMean} m`;
 
-        // Popup at click location
         new maplibregl.Popup({ offset: [0, -10] })
           .setLngLat(e.lngLat)
           .setHTML(`
@@ -569,14 +577,14 @@
 
     // Layer Visibility & Opacity Controls
     document.getElementById('toggle-ortho').addEventListener('change', (e) => {
-      if (map.getLayer('ortho-cog-layer')) {
-        map.setLayoutProperty('ortho-cog-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+      if (map.getLayer('ortho-pmtiles-layer')) {
+        map.setLayoutProperty('ortho-pmtiles-layer', 'visibility', e.target.checked ? 'visible' : 'none');
       }
     });
 
     document.getElementById('slider-ortho-opacity').addEventListener('input', (e) => {
-      if (map.getLayer('ortho-cog-layer')) {
-        map.setPaintProperty('ortho-cog-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
+      if (map.getLayer('ortho-pmtiles-layer')) {
+        map.setPaintProperty('ortho-pmtiles-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
       }
     });
 
