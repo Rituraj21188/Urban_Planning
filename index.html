@@ -1,352 +1,619 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <title>Urban 3D Digital Twin - Filebase IPFS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GeoAI 3D Building Twin - Filebase COG Stream</title>
 
-  <!-- MapLibre & Deck.gl Core -->
-  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
-  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-  <script src="https://unpkg.com/deck.gl@8.9.33/dist.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- MapLibre GL JS -->
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <style>
-    :root {
-      --panel-bg: rgba(15, 23, 42, 0.94);
-      --accent: #00f2fe;
-      --accent-glow: rgba(0, 242, 254, 0.3);
-      --accent-grad: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
-      --text-main: #f8fafc;
-      --text-muted: #94a3b8;
-      --border-subtle: rgba(255, 255, 255, 0.12);
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0b0f19; font-family: 'Inter', system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
+
+    /* Glassmorphism styling */
+    .glass-hud {
+      background: rgba(15, 23, 42, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(56, 189, 248, 0.1);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body, html { height: 100%; width: 100%; font-family: 'Plus Jakarta Sans', sans-serif; overflow: hidden; background: #050b14; }
-    #map-container { height: 100vh; width: 100%; position: absolute; top: 0; left: 0; }
-
-    /* Floating Cyber GIS Dashboard */
-    .dashboard {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 10;
-      width: 430px;
-      max-height: calc(100vh - 40px);
-      overflow-y: auto;
-      background: var(--panel-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--border-subtle);
-      border-radius: 14px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px var(--accent-glow);
-      padding: 22px;
-      color: var(--text-main);
+    /* MapLibre Popup Overrides */
+    .maplibregl-popup-content {
+      background: rgba(15, 23, 42, 0.95) !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(56, 189, 248, 0.3) !important;
+      border-radius: 10px !important;
+      padding: 12px 16px !important;
+      box-shadow: 0 12px 24px rgba(0,0,0,0.6) !important;
     }
-
-    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    h2 { font-size: 16px; font-weight: 700; color: #fff; }
-    
-    .badge {
-      padding: 3px 9px;
-      border-radius: 20px;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      font-family: 'JetBrains Mono', monospace;
-      background: rgba(0, 242, 254, 0.15);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.3);
+    .maplibregl-popup-close-button {
+      color: #94a3b8 !important;
+      font-size: 16px !important;
+      padding: 4px 8px !important;
     }
-
-    p.subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
-
-    .control-box {
-      background: rgba(0, 0, 0, 0.35);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+    .maplibregl-popup-tip {
+      border-top-color: rgba(15, 23, 42, 0.95) !important;
     }
-
-    .control-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px; font-weight: 600; }
-    input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
-
-    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
-    .btn {
-      padding: 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.2s;
-      border: none;
-    }
-    .btn-accent { background: var(--accent-grad); color: #090d16; }
-    .btn-accent:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .btn-secondary { background: rgba(255, 255, 255, 0.06); color: var(--text-main); border: 1px solid var(--border-subtle); }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
-
-    .card {
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      padding: 12px;
-      margin-top: 10px;
-    }
-    .card h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
-
-    .telemetry-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
-    .telemetry-row span.val { color: #38bdf8; font-weight: 600; word-break: break-all; }
   </style>
 </head>
-<body>
+<body class="text-slate-100">
 
-  <div id="map-container"></div>
+  <!-- Interactive Map Canvas -->
+  <div id="map"></div>
 
-  <div class="dashboard">
-    <div class="header-row">
-      <h2>3D Digital Twin</h2>
-      <span class="badge" id="renderBadge">ONLINE</span>
-    </div>
-    <p class="subtitle">Direct COG Stream &amp; 3D Extrusion Engine</p>
-
-    <div class="control-box">
-      <div class="control-header">
-        <span>3D Extrusion Vertical Scale</span>
-        <span id="scaleVal" style="color:var(--accent); font-family:'JetBrains Mono'">1.0x</span>
+  <!-- Top Status Bar & Gateway Indicator -->
+  <header class="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-3">
+    <div class="glass-hud px-4 py-2.5 rounded-xl flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-bold tracking-wide text-xs uppercase text-sky-400">IPFS Twin</span>
       </div>
-      <input type="range" id="extrusionSlider" min="0.5" max="3.0" step="0.1" value="1.0" />
-
-      <div class="control-header" style="margin-top: 10px;">
-        <span>Camera Tilt (Pitch)</span>
-        <span id="pitchVal" style="color:var(--accent); font-family:'JetBrains Mono'">55°</span>
+      <div class="h-4 w-px bg-slate-700"></div>
+      <div class="flex items-center gap-2 text-xs text-slate-300">
+        <i class="fa-solid fa-server text-slate-400 text-[11px]"></i>
+        <select id="gateway-selector" class="bg-slate-800/90 border border-slate-700 rounded px-2 py-1 text-sky-300 text-xs focus:ring-1 focus:ring-sky-400 outline-none cursor-pointer">
+          <option value="https://ipfs.filebase.io/ipfs">Filebase Gateway</option>
+          <option value="https://cloudflare-ipfs.com/ipfs">Cloudflare IPFS</option>
+          <option value="https://ipfs.io/ipfs">IPFS.io</option>
+          <option value="https://dweb.link/ipfs">Dweb.link</option>
+        </select>
       </div>
-      <input type="range" id="pitchSlider" min="0" max="75" step="5" value="55" />
+    </div>
 
-      <div class="control-header" style="margin-top: 10px;">
-        <span>Ortho Layer Opacity</span>
-        <span id="opacityVal" style="color:var(--accent); font-family:'JetBrains Mono'">100%</span>
+    <!-- Quick Navigation / Stats Pill -->
+    <div id="quick-stats-pill" class="glass-hud px-3.5 py-2 rounded-xl text-xs flex items-center gap-4 text-slate-300">
+      <div><span class="text-slate-400">Buildings:</span> <span id="stat-count" class="font-semibold text-sky-400">--</span></div>
+      <div class="h-3 w-px bg-slate-700"></div>
+      <div><span class="text-slate-400">Max Ht:</span> <span id="stat-max" class="font-semibold text-amber-400">-- m</span></div>
+      <div class="h-3 w-px bg-slate-700"></div>
+      <div><span class="text-slate-400">Avg Ht:</span> <span id="stat-avg" class="font-semibold text-emerald-400">-- m</span></div>
+    </div>
+  </header>
+
+  <!-- Right Sidebar: Controls & Layer HUD -->
+  <aside class="absolute top-4 right-4 z-20 w-80 max-h-[calc(100vh-2rem)] flex flex-col gap-3">
+    <div class="glass-hud rounded-2xl p-4 flex flex-col gap-4 overflow-y-auto">
+      
+      <!-- Panel Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-layer-group text-sky-400 text-sm"></i>
+          <h2 class="font-semibold text-sm text-slate-100">Layer Stack & 3D Controls</h2>
+        </div>
+        <button id="btn-recenter" title="Recenter to Scene" class="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-sky-300 transition">
+          <i class="fa-solid fa-crosshairs text-xs"></i>
+        </button>
       </div>
-      <input type="range" id="opacitySlider" min="0" max="100" step="5" value="100" />
-    </div>
 
-    <div class="btn-grid">
-      <button class="btn btn-accent" id="btnZoomSurvey">Zoom to Survey</button>
-      <button class="btn btn-secondary" id="btnToggleWireframe">Wireframe Mode</button>
-    </div>
+      <!-- Raster Layer Toggles (COG) -->
+      <div class="space-y-2.5">
+        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Raster Stream (IPFS COG)</span>
+        
+        <!-- Ortho COG Toggle -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-200">
+              <i class="fa-solid fa-map text-emerald-400"></i> Urban Ortho COG
+            </span>
+            <input type="checkbox" id="toggle-ortho" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
+          </div>
+          <div class="flex items-center justify-between gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+            <span>Opacity</span>
+            <input type="range" id="slider-ortho-opacity" min="0" max="100" value="100" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+          </div>
+        </div>
 
-    <div class="card">
-      <h4>Telemetry &amp; Coordinate Alignment</h4>
-      <div class="telemetry-row"><span>Ortho CID:</span><span class="val">QmYYCV...zcayv</span></div>
-      <div class="telemetry-row"><span>Survey Center:</span><span class="val" id="surveyCoordVal">Detecting...</span></div>
-      <div class="telemetry-row"><span>Footprints Loaded:</span><span class="val" id="bldgCountVal">Reading GeoJSON...</span></div>
-      <div class="telemetry-row"><span>Tile Pipeline:</span><span class="val">TiTiler Cloud Pyramid</span></div>
+        <!-- Elevation Raster Switcher (DSM / DTM) -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-200">
+              <i class="fa-solid fa-mountain-sun text-amber-400"></i> Elevation Overlay
+            </span>
+            <input type="checkbox" id="toggle-elevation" class="accent-sky-400 w-4 h-4 cursor-pointer" />
+          </div>
+          <div class="flex items-center justify-between gap-2 text-[11px] pt-1 border-t border-slate-800/80">
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+              <input type="radio" name="elev-mode" value="dsm" checked class="accent-amber-400" /> DSM COG
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
+              <input type="radio" name="elev-mode" value="dtm" class="accent-amber-400" /> DTM COG
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vector Layer Toggles (3D Buildings) -->
+      <div class="space-y-2.5">
+        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Extruded Vectors</span>
+
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-3">
+          <div class="flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-200 font-medium">
+              <i class="fa-solid fa-cubes text-sky-400"></i> 3D Building Extrusion
+            </span>
+            <input type="checkbox" id="toggle-buildings" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
+          </div>
+
+          <!-- Color Mode Toggle -->
+          <div class="flex items-center justify-between text-[11px] text-slate-300">
+            <span>Coloring</span>
+            <div class="inline-flex rounded-lg border border-slate-700 bg-slate-800/70 p-0.5">
+              <button id="btn-colormode-heat" class="px-2 py-0.5 rounded text-[10px] font-medium bg-sky-500/20 text-sky-300">Elevation</button>
+              <button id="btn-colormode-mono" class="px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-slate-200">Modern</button>
+            </div>
+          </div>
+
+          <!-- Height Exaggeration Slider -->
+          <div class="flex flex-col gap-1 text-[11px] text-slate-400">
+            <div class="flex justify-between items-center">
+              <span>Height Exaggeration</span>
+              <span id="label-height-scale" class="text-sky-300 font-mono">1.0x</span>
+            </div>
+            <input type="range" id="slider-height-scale" min="0.5" max="3.0" step="0.1" value="1.0" class="accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Building Feature Inspector Details -->
+      <div id="inspector-card" class="bg-slate-900/80 p-3 rounded-xl border border-sky-500/20 flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-sky-400 uppercase tracking-wider">
+            <i class="fa-solid fa-circle-info mr-1"></i> Feature Inspector
+          </span>
+          <span id="inspect-id" class="text-[10px] font-mono text-slate-400">Click a building</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+            <div class="text-[10px] text-slate-400">Peak Height (h_max)</div>
+            <div id="inspect-hmax" class="text-sm font-semibold text-slate-100 mt-0.5">--</div>
+          </div>
+          <div class="bg-slate-800/60 p-2 rounded-lg border border-slate-700/50">
+            <div class="text-[10px] text-slate-400">Mean Height (h_mean)</div>
+            <div id="inspect-hmean" class="text-sm font-semibold text-slate-100 mt-0.5">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IPFS Status Pill -->
+      <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+        <div class="flex items-center gap-1.5">
+          <i class="fa-solid fa-cubes-stacked text-purple-400 text-xs"></i>
+          <span>Pinned via Filebase</span>
+        </div>
+        <a href="https://console.filebase.com" target="_blank" class="text-sky-400 hover:underline">Filebase S3 &rarr;</a>
+      </div>
+
     </div>
+  </aside>
+
+  <!-- Loading State Banner -->
+  <div id="loading-badge" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 glass-hud px-4 py-2 rounded-full flex items-center gap-3 text-xs shadow-2xl transition-opacity duration-300">
+    <i class="fa-solid fa-circle-notch fa-spin text-sky-400"></i>
+    <span id="loading-text" class="text-slate-200">Querying Filebase IPFS Gateway...</span>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-50 glass-hud border border-amber-500/50 text-amber-200 text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2">
+    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+    <span id="toast-msg">Notice</span>
   </div>
 
   <script>
-    // 1. IPFS Gateway links for your uploaded files
-    const ORTHO_IPFS_URL = "https://ipfs.filebase.io/ipfs/QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv";
-    const TITILER_BASE = "https://titiler.xyz/cog";
-    const TILE_STREAM_URL = `${TITILER_BASE}/tiles/{z}/{x}/{y}.png?url=${encodeURIComponent(ORTHO_IPFS_URL)}`;
+    // =========================================================================
+    // 1. IPFS CIDs & TiTiler Configuration
+    // =========================================================================
+    const CIDS = {
+      urbanOrthoCOG: "QmYYCVqgQRJqT9Sea45wBYDp45yEZWUWQDFnQiCFqzcayv",
+      dsmCOG: "QmXjtD6EZZZcUdMFxV2QWWkBbgPp28kxscyF6mj2FYRkm5",
+      dtmCOG: "QmfTFvWRHCurht3491seVBa5eGZ2utjCJP43usoJpTmRHN",
+      buildingsWithHeights: "QmPtpP7bxxF1FTMy8vjwycSwRE69jaVC231seodtjD4SYd",
+      buildingsFootprints: "QmPNJGorZ2XKUXuAem494duSfsLBQED79jW6abDNLivqSu",
+      buildingsMask: "QmPiaAkh3zoveViB4ofemprm7y4ESpHSe1ZN6G2r5ndjWq",
+      buildingsRaw: "QmcvdyAXAAdAZcvrsRR4kFJrKyCK1kTw85vwSXg3GLfM1R"
+    };
 
-    // Default startup position (Initial overview of Assam)
+    let activeGateway = "https://ipfs.filebase.io/ipfs";
+    let heightMultiplier = 1.0;
+    let buildingColorMode = 'heat'; // 'heat' or 'mono'
+    let buildingsGeojsonData = null;
+
+    // =========================================================================
+    // 2. MapLibre GL JS Initialization
+    // =========================================================================
     const map = new maplibregl.Map({
-      container: 'map-container',
+      container: 'map',
       style: {
         version: 8,
+        glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
-          'esri-satellite': {
+          'satellite-base': {
             type: 'raster',
-            tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-            tileSize: 256
+            tiles: [
+              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            ],
+            tileSize: 256,
+            attribution: '&copy; Esri, Maxar, Earthstar'
           }
         },
-        layers: [{
-          id: 'esri-satellite-layer',
-          type: 'raster',
-          source: 'esri-satellite',
-          minzoom: 0,
-          maxzoom: 22
-        }]
+        layers: [
+          {
+            id: 'satellite-basemap',
+            type: 'raster',
+            source: 'satellite-base',
+            minzoom: 0,
+            maxzoom: 22
+          }
+        ]
       },
-      center: [91.736, 26.144], // Default Guwahati center
-      zoom: 14,
-      pitch: 55,
-      bearing: -15,
+      center: [0, 0], // Replaced automatically on GeoJSON fetch
+      zoom: 2,
+      pitch: 58,
+      bearing: -20,
       antialias: true
     });
 
-    let deckOverlay = null;
-    let extrusionScale = 1.0;
-    let isWireframe = false;
-    let surveyBounds = null;
-    let surveyCenter = null;
-    let buildingGeoJSON = null;
+    // Navigation and pitch controls
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
 
-    // 2. Query TiTiler for the exact geographic bounds of your Orthomosaic
-    async function locateSurveyBounds() {
-      try {
-        const boundsUrl = `${TITILER_BASE}/bounds?url=${encodeURIComponent(ORTHO_IPFS_URL)}`;
-        const res = await fetch(boundsUrl);
-        const data = await res.json();
+    // =========================================================================
+    // 3. Dynamic IPFS & COG Layer Management
+    // =========================================================================
+    function getIpfsUrl(cid) {
+      return `${activeGateway}/${cid}`;
+    }
 
-        if (data.bounds) {
-          surveyBounds = data.bounds; // [minx, miny, maxx, maxy]
-          surveyCenter = [
-            (surveyBounds[0] + surveyBounds[2]) / 2,
-            (surveyBounds[1] + surveyBounds[3]) / 2
-          ];
+    function getTiTilerUrl(cid, colormap = '') {
+      const rawUrl = getIpfsUrl(cid);
+      const encoded = encodeURIComponent(rawUrl);
+      let tileUrl = `https://titiler.xyz/cog/tiles/{z}/{x}/{y}.png?url=${encoded}`;
+      if (colormap) {
+        tileUrl += `&colormap_name=${colormap}`;
+      }
+      return tileUrl;
+    }
 
-          document.getElementById('surveyCoordVal').innerText = 
-            `${surveyCenter[0].toFixed(5)}, ${surveyCenter[1].toFixed(5)}`;
+    function showToast(message, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      toastMsg.innerText = message;
+      toast.className = `absolute top-4 left-1/2 -translate-x-1/2 z-50 glass-hud border text-xs px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-2 ${
+        isError ? 'border-red-500/50 text-red-200' : 'border-amber-500/50 text-amber-200'
+      }`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4500);
+    }
 
-          // Re-center directly to the survey location
-          map.flyTo({
-            center: surveyCenter,
-            zoom: 17,
-            pitch: 55,
-            bearing: -15,
-            duration: 2500
-          });
-        }
-      } catch (err) {
-        console.warn("Could not query COG bounds API directly:", err);
-        document.getElementById('surveyCoordVal').innerText = "Assam Survey ROI";
+    function setLoading(visible, text = "Loading data...") {
+      const badge = document.getElementById('loading-badge');
+      const badgeText = document.getElementById('loading-text');
+      badgeText.innerText = text;
+      if (visible) {
+        badge.classList.remove('opacity-0', 'pointer-events-none');
+      } else {
+        badge.classList.add('opacity-0', 'pointer-events-none');
       }
     }
 
-    // 3. Mount the Orthomosaic as an active raster tile layer
-    function mountOrthoStream() {
-      if (map.getSource('filebase-ortho-source')) return;
+    // Refresh raster COG tile layers
+    function reloadRasterLayers() {
+      // 1. Urban Ortho COG
+      if (map.getSource('ortho-cog-source')) {
+        if (map.getLayer('ortho-cog-layer')) map.removeLayer('ortho-cog-layer');
+        map.removeSource('ortho-cog-source');
+      }
 
-      map.addSource('filebase-ortho-source', {
+      map.addSource('ortho-cog-source', {
         type: 'raster',
-        tiles: [TILE_STREAM_URL],
+        tiles: [getTiTilerUrl(CIDS.urbanOrthoCOG)],
         tileSize: 256
       });
 
       map.addLayer({
-        id: 'filebase-ortho-layer',
+        id: 'ortho-cog-layer',
         type: 'raster',
-        source: 'filebase-ortho-source',
-        minzoom: 10,
-        maxzoom: 22,
+        source: 'ortho-cog-source',
         paint: {
-          'raster-opacity': 1.0
+          'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100
         }
-      });
+      }, 'buildings-extruded'); // Insert under 3D buildings
+
+      // 2. Elevation COG (DSM/DTM)
+      const isElevActive = document.getElementById('toggle-elevation').checked;
+      const elevMode = document.querySelector('input[name="elev-mode"]:checked').value;
+      const elevCid = elevMode === 'dsm' ? CIDS.dsmCOG : CIDS.dtmCOG;
+
+      if (map.getSource('elevation-cog-source')) {
+        if (map.getLayer('elevation-cog-layer')) map.removeLayer('elevation-cog-layer');
+        map.removeSource('elevation-cog-source');
+      }
+
+      if (isElevActive) {
+        map.addSource('elevation-cog-source', {
+          type: 'raster',
+          tiles: [getTiTilerUrl(elevCid, 'terrain')],
+          tileSize: 256
+        });
+
+        map.addLayer({
+          id: 'elevation-cog-layer',
+          type: 'raster',
+          source: 'elevation-cog-source',
+          paint: {
+            'raster-opacity': 0.75
+          }
+        }, 'buildings-extruded');
+      }
     }
 
-    // 4. Load Building Vector Footprints and render with Deck.gl
+    // =========================================================================
+    // 4. Fetch & Extrude GeoJSON Buildings with Heights
+    // =========================================================================
     async function loadBuildingFootprints() {
-      try {
-        const res = await fetch('buildings.geojson');
-        if (!res.ok) throw new Error("buildings.geojson not found");
-        buildingGeoJSON = await res.json();
+      setLoading(true, "Downloading building vectors from IPFS...");
+      
+      const candidateCids = [CIDS.buildingsWithHeights, CIDS.buildingsFootprints, CIDS.buildingsRaw];
+      let loaded = false;
 
-        document.getElementById('bldgCountVal').innerText = 
-          `${buildingGeoJSON.features.length} structures`;
-
-        // If the GeoJSON has real features, zoom directly to them
-        if (buildingGeoJSON.features.length > 0 && !surveyBounds) {
-          const firstCoord = buildingGeoJSON.features[0].geometry.coordinates[0][0];
-          map.flyTo({ center: [firstCoord[0], firstCoord[1]], zoom: 17, pitch: 55 });
+      for (const cid of candidateCids) {
+        const url = getIpfsUrl(cid);
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) continue;
+          buildingsGeojsonData = await resp.json();
+          loaded = true;
+          break;
+        } catch (err) {
+          console.warn(`Gateway fetch failed for ${cid}, trying fallback...`, err);
         }
-
-        render3DBuildings();
-      } catch (err) {
-        console.warn(err);
-        document.getElementById('bldgCountVal').innerText = "Pending Workflow Output";
       }
-    }
 
-    // 5. Render 3D Extruded Buildings using Deck.gl
-    function render3DBuildings() {
-      if (!buildingGeoJSON) return;
+      if (!loaded || !buildingsGeojsonData || !buildingsGeojsonData.features) {
+        setLoading(false);
+        showToast("Gateway timeout or CORS restriction on current IPFS node. Switch gateways above.", true);
+        return;
+      }
 
-      const layer = new deck.GeoJsonLayer({
-        id: 'deck-buildings-layer',
-        data: buildingGeoJSON,
-        extruded: true,
-        wireframe: isWireframe,
-        getElevation: f => (f.properties.height_m || 6.5) * extrusionScale,
-        getFillColor: f => {
-          const h = f.properties.height_m || 6.5;
-          if (h > 12) return [0, 242, 254, 230];
-          if (h > 6) return [56, 189, 248, 220];
-          return [30, 58, 138, 200];
-        },
-        getLineColor: [0, 242, 254, 255],
-        lineWidthMinPixels: 1,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [244, 63, 94, 230],
-        material: {
-          ambient: 0.35,
-          diffuse: 0.65,
-          shininess: 32,
-          specularColor: [255, 255, 255]
+      // Compute bounding box and building statistics
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let count = 0, totalH = 0, maxH = 0;
+
+      buildingsGeojsonData.features.forEach((feat, index) => {
+        if (!feat.id) feat.id = index + 1;
+        const props = feat.properties || {};
+        
+        // Resolve height fields
+        const hMax = Number(props.h_max ?? props.max_height ?? props.height ?? 3.5);
+        const hMean = Number(props.h_mean ?? props.mean_height ?? props.avg_height ?? (hMax * 0.85));
+        
+        props._calc_h_max = hMax > 0 ? hMax : 3.0;
+        props._calc_h_mean = hMean > 0 ? hMean : 2.5;
+
+        count++;
+        totalH += props._calc_h_mean;
+        if (props._calc_h_max > maxH) maxH = props._calc_h_max;
+
+        // Traverse geometry to get map bounds
+        const scanCoords = (coords) => {
+          if (typeof coords[0] === 'number') {
+            const [lng, lat] = coords;
+            if (lng < minX) minX = lng;
+            if (lng > maxX) maxX = lng;
+            if (lat < minY) minY = lat;
+            if (lat > maxY) maxY = lat;
+          } else {
+            coords.forEach(scanCoords);
+          }
+        };
+        if (feat.geometry && feat.geometry.coordinates) {
+          scanCoords(feat.geometry.coordinates);
         }
       });
 
-      if (!deckOverlay) {
-        deckOverlay = new deck.MapboxOverlay({ layers: [layer] });
-        map.addControl(deckOverlay);
+      // Update HUD metrics
+      document.getElementById('stat-count').innerText = count.toLocaleString();
+      document.getElementById('stat-max').innerText = `${maxH.toFixed(1)} m`;
+      document.getElementById('stat-avg').innerText = count > 0 ? `${(totalH / count).toFixed(1)} m` : '--';
+
+      // Update or Add GeoJSON Source
+      if (map.getSource('buildings-source')) {
+        map.getSource('buildings-source').setData(buildingsGeojsonData);
       } else {
-        deckOverlay.setProps({ layers: [layer] });
+        map.addSource('buildings-source', {
+          type: 'geojson',
+          data: buildingsGeojsonData,
+          generateId: true
+        });
+
+        // 3D Extrusion Layer
+        map.addLayer({
+          id: 'buildings-extruded',
+          type: 'fill-extrusion',
+          source: 'buildings-source',
+          paint: {
+            'fill-extrusion-height': [
+              '*',
+              ['coalesce', ['get', '_calc_h_max'], 3.0],
+              heightMultiplier
+            ],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-color': getBuildingColorExpression(),
+            'fill-extrusion-opacity': 0.92
+          }
+        });
+
+        // 2D Outline Border for crisp rendering
+        map.addLayer({
+          id: 'buildings-outline',
+          type: 'line',
+          source: 'buildings-source',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 1.0,
+            'line-opacity': 0.4
+          }
+        });
       }
+
+      // Fly camera directly to the urban boundary
+      if (minX !== Infinity && minY !== Infinity) {
+        map.fitBounds([[minX, minY], [maxX, maxY]], {
+          padding: 60,
+          pitch: 55,
+          bearing: -15,
+          duration: 2200,
+          maxZoom: 18.5
+        });
+      }
+
+      setLoading(false);
     }
 
-    // 6. UI Interaction Controls
-    document.getElementById('extrusionSlider').addEventListener('input', (e) => {
-      extrusionScale = parseFloat(e.target.value);
-      document.getElementById('scaleVal').innerText = extrusionScale.toFixed(1) + "x";
-      render3DBuildings();
-    });
-
-    document.getElementById('pitchSlider').addEventListener('input', (e) => {
-      const pitch = parseInt(e.target.value);
-      map.setPitch(pitch);
-      document.getElementById('pitchVal').innerText = pitch + "°";
-    });
-
-    document.getElementById('opacitySlider').addEventListener('input', (e) => {
-      const val = parseInt(e.target.value);
-      document.getElementById('opacityVal').innerText = val + "%";
-      if (map.getLayer('filebase-ortho-layer')) {
-        map.setPaintProperty('filebase-ortho-layer', 'raster-opacity', val / 100);
+    // Color ramp expressions
+    function getBuildingColorExpression() {
+      if (buildingColorMode === 'mono') {
+        return '#cbd5e1';
       }
-    });
+      // Height-based heat gradient (Cool Cyan -> Lime -> Amber -> Coral Red)
+      return [
+        'interpolate',
+        ['linear'],
+        ['coalesce', ['get', '_calc_h_max'], 3.0],
+        2.5, '#38bdf8',
+        6.0, '#34d399',
+        12.0, '#fbbf24',
+        22.0, '#f87171'
+      ];
+    }
 
-    document.getElementById('btnToggleWireframe').addEventListener('click', () => {
-      isWireframe = !isWireframe;
-      document.getElementById('btnToggleWireframe').innerText = isWireframe ? "Solid Mode" : "Wireframe Mode";
-      render3DBuildings();
-    });
+    function updateBuildingStyle() {
+      if (!map.getLayer('buildings-extruded')) return;
+      map.setPaintProperty('buildings-extruded', 'fill-extrusion-color', getBuildingColorExpression());
+      map.setPaintProperty('buildings-extruded', 'fill-extrusion-height', [
+        '*',
+        ['coalesce', ['get', '_calc_h_max'], 3.0],
+        heightMultiplier
+      ]);
+    }
 
-    document.getElementById('btnZoomSurvey').addEventListener('click', () => {
-      if (surveyCenter) {
-        map.flyTo({ center: surveyCenter, zoom: 17, pitch: 55 });
-      } else {
-        locateSurveyBounds();
-      }
-    });
-
+    // =========================================================================
+    // 5. User Interaction & Event Listeners
+    // =========================================================================
     map.on('load', () => {
-      mountOrthoStream();
-      locateSurveyBounds();
+      reloadRasterLayers();
       loadBuildingFootprints();
+
+      // Feature Click Popup & Inspector
+      map.on('click', 'buildings-extruded', (e) => {
+        if (!e.features.length) return;
+        const feat = e.features[0];
+        const props = feat.properties;
+
+        const hMax = Number(props._calc_h_max || props.h_max || 0).toFixed(2);
+        const hMean = Number(props._calc_h_mean || props.h_mean || 0).toFixed(2);
+        const fid = feat.id || props.fid || 'Structure';
+
+        // Update inspector sidebar
+        document.getElementById('inspect-id').innerText = `ID #${fid}`;
+        document.getElementById('inspect-hmax').innerText = `${hMax} m`;
+        document.getElementById('inspect-hmean').innerText = `${hMean} m`;
+
+        // Popup at click location
+        new maplibregl.Popup({ offset: [0, -10] })
+          .setLngLat(e.lngLat)
+          .setHTML(`
+            <div class="space-y-1">
+              <div class="font-bold text-sky-400 text-xs tracking-wide">Building ${fid}</div>
+              <div class="text-[11px] text-slate-300"><b>Peak Height:</b> ${hMax} m</div>
+              <div class="text-[11px] text-slate-300"><b>Mean Height:</b> ${hMean} m</div>
+            </div>
+          `)
+          .addTo(map);
+      });
+
+      map.on('mouseenter', 'buildings-extruded', () => map.getCanvas().style.cursor = 'pointer');
+      map.on('mouseleave', 'buildings-extruded', () => map.getCanvas().style.cursor = '');
+    });
+
+    // Recenter Button
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+      if (buildingsGeojsonData) {
+        loadBuildingFootprints();
+      }
+    });
+
+    // Gateway Selector Change
+    document.getElementById('gateway-selector').addEventListener('change', (e) => {
+      activeGateway = e.target.value;
+      showToast(`Switched gateway to: ${new URL(activeGateway).hostname}`);
+      reloadRasterLayers();
+      loadBuildingFootprints();
+    });
+
+    // Layer Visibility & Opacity Controls
+    document.getElementById('toggle-ortho').addEventListener('change', (e) => {
+      if (map.getLayer('ortho-cog-layer')) {
+        map.setLayoutProperty('ortho-cog-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+      }
+    });
+
+    document.getElementById('slider-ortho-opacity').addEventListener('input', (e) => {
+      if (map.getLayer('ortho-cog-layer')) {
+        map.setPaintProperty('ortho-cog-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
+      }
+    });
+
+    document.getElementById('toggle-elevation').addEventListener('change', reloadRasterLayers);
+    document.querySelectorAll('input[name="elev-mode"]').forEach(radio => {
+      radio.addEventListener('change', reloadRasterLayers);
+    });
+
+    document.getElementById('toggle-buildings').addEventListener('change', (e) => {
+      const vis = e.target.checked ? 'visible' : 'none';
+      if (map.getLayer('buildings-extruded')) map.setLayoutProperty('buildings-extruded', 'visibility', vis);
+      if (map.getLayer('buildings-outline')) map.setLayoutProperty('buildings-outline', 'visibility', vis);
+    });
+
+    // Height Scale Exaggeration
+    document.getElementById('slider-height-scale').addEventListener('input', (e) => {
+      heightMultiplier = parseFloat(e.target.value);
+      document.getElementById('label-height-scale').innerText = `${heightMultiplier.toFixed(1)}x`;
+      updateBuildingStyle();
+    });
+
+    // Color Mode Switcher
+    const btnHeat = document.getElementById('btn-colormode-heat');
+    const btnMono = document.getElementById('btn-colormode-mono');
+
+    btnHeat.addEventListener('click', () => {
+      buildingColorMode = 'heat';
+      btnHeat.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-sky-500/20 text-sky-300';
+      btnMono.className = 'px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-slate-200';
+      updateBuildingStyle();
+    });
+
+    btnMono.addEventListener('click', () => {
+      buildingColorMode = 'mono';
+      btnMono.className = 'px-2 py-0.5 rounded text-[10px] font-medium bg-sky-500/20 text-sky-300';
+      btnHeat.className = 'px-2 py-0.5 rounded text-[10px] font-medium text-slate-400 hover:text-slate-200';
+      updateBuildingStyle();
     });
   </script>
 </body>
