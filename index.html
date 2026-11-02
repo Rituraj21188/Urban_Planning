@@ -12,14 +12,14 @@
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 
-  <!-- Protomaps PMTiles JS Protocol (v3.0.7 for full MapLibre v4 compatibility) -->
+  <!-- Protomaps PMTiles JS Protocol (v3.0.7) -->
   <script src="https://unpkg.com/pmtiles@3.0.7/dist/pmtiles.js"></script>
 
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0b0f19; font-family: 'Inter', system-ui, sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0f172a; font-family: 'Inter', system-ui, sans-serif; }
     #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
     /* Custom scrollbars */
@@ -28,9 +28,9 @@
     ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
 
-    /* Glassmorphism styling */
+    /* Glassmorphism HUD */
     .glass-hud {
-      background: rgba(15, 23, 42, 0.85);
+      background: rgba(15, 23, 42, 0.88);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <!-- Quick Navigation / Stats Pill -->
+    <!-- Stats Pill -->
     <div id="quick-stats-pill" class="glass-hud px-3.5 py-2 rounded-xl text-xs flex items-center gap-4 text-slate-300">
       <div><span class="text-slate-400">Buildings:</span> <span id="stat-count" class="font-semibold text-sky-400">--</span></div>
       <div class="h-3 w-px bg-slate-700"></div>
@@ -105,15 +105,15 @@
         </button>
       </div>
 
-      <!-- Raster Layer Toggles -->
-      <div class="space-y-2.5">
+      <!-- Raster Layer Controls -->
+      <div class="space-y-3">
         <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Raster Stream (IPFS PMTiles)</span>
         
         <!-- Ortho PMTiles Toggle -->
         <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs">
             <span class="flex items-center gap-2 text-slate-200">
-              <i class="fa-solid fa-map text-emerald-400"></i> High-Res Drone Orthomosaic
+              <i class="fa-solid fa-map text-emerald-400"></i> High-Res Drone Ortho
             </span>
             <input type="checkbox" id="toggle-ortho" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
           </div>
@@ -121,8 +121,30 @@
             <span>Opacity</span>
             <input type="range" id="slider-ortho-opacity" min="0" max="100" value="100" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
           </div>
-          <div id="ortho-bounds-indicator" class="text-[10px] text-slate-500 font-mono truncate">
+          <div id="ortho-bounds-indicator" class="text-[10px] text-slate-400 font-mono truncate">
             Status: Connecting...
+          </div>
+        </div>
+
+        <!-- Collar / Black Collar Elimination Toggle -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+          <span class="flex items-center gap-2 text-slate-200">
+            <i class="fa-solid fa-crop-simple text-purple-400"></i> Trim Black Collar
+          </span>
+          <input type="checkbox" id="toggle-collar-clip" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
+        </div>
+
+        <!-- OpenStreetMap Streets & Labels Overlay Toggle -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-200">
+              <i class="fa-solid fa-road text-amber-400"></i> OSM Streets & Labels Overlay
+            </span>
+            <input type="checkbox" id="toggle-osm-overlay" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
+          </div>
+          <div class="flex items-center justify-between gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
+            <span>Overlay Opacity</span>
+            <input type="range" id="slider-osm-opacity" min="0" max="100" value="90" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
           </div>
         </div>
       </div>
@@ -205,7 +227,7 @@
 
   <script>
     // =========================================================================
-    // 1. Register Protomaps PMTiles Protocol with MapLibre GL
+    // 1. Protomaps PMTiles Protocol Setup
     // =========================================================================
     const protocol = new pmtiles.Protocol();
     maplibregl.addProtocol("pmtiles", protocol.tile);
@@ -222,12 +244,12 @@
 
     let activeGateway = "https://ipfs.filebase.io/ipfs";
     let heightMultiplier = 1.0;
-    let buildingColorMode = 'heat'; // 'heat' or 'mono'
+    let buildingColorMode = 'heat';
     let buildingsGeojsonData = null;
     let orthoBounds = null;
 
     // =========================================================================
-    // 3. MapLibre GL JS Initialization
+    // 3. MapLibre GL JS Initialization (OpenStreetMap Standard Base)
     // =========================================================================
     const map = new maplibregl.Map({
       container: 'map',
@@ -235,29 +257,42 @@
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
-          'satellite-base': {
+          // OpenStreetMap Standard Tiles as the base layer
+          'osm-base': {
             type: 'raster',
             tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
             ],
             tileSize: 256,
-            attribution: '&copy; Esri, Maxar, Earthstar'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxzoom: 19
+          },
+          // Transparent OSM Overlay (Roads, Lines & Labels) to overlay over the drone ortho
+          'osm-roads-labels-overlay': {
+            type: 'raster',
+            tiles: [
+              'https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
+              'https://b.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
+              'https://c.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png'
+            ],
+            tileSize: 256,
+            maxzoom: 20
           }
         },
         layers: [
           {
-            id: 'satellite-basemap',
+            id: 'osm-basemap-layer',
             type: 'raster',
-            source: 'satellite-base',
+            source: 'osm-base',
             minzoom: 0,
-            maxzoom: 22
+            maxzoom: 19
           }
         ]
       },
-      center: [91.6472, 26.1681], // Suburban cluster coordinates
-      zoom: 15.5,
-      pitch: 58,
-      bearing: -20,
+      center: [91.6472, 26.1681],
+      zoom: 16,
+      pitch: 52,
+      bearing: -15,
       antialias: true
     });
 
@@ -291,7 +326,7 @@
     }
 
     // =========================================================================
-    // 4. Robust PMTiles Direct Source Loader & Bounds Reader
+    // 4. Drone PMTiles Stream & Rotated Collar Elimination
     // =========================================================================
     async function loadPMTilesRasterLayer() {
       const statusIndicator = document.getElementById('ortho-bounds-indicator');
@@ -299,9 +334,8 @@
       const pmtilesProtocolUrl = `pmtiles://${httpUrl}`;
 
       try {
-        statusIndicator.innerText = "Connecting to PMTiles header...";
+        statusIndicator.innerText = "Connecting PMTiles header...";
 
-        // Inspect header and bounds via PMTiles JS client directly
         const pInstance = new pmtiles.PMTiles(httpUrl);
         protocol.add(pInstance);
 
@@ -311,14 +345,13 @@
           [header.maxLon, header.maxLat]
         ];
 
-        statusIndicator.innerText = `Zoom ${header.minZoom}-${header.maxZoom} | Active`;
+        statusIndicator.innerText = `Zoom ${header.minZoom}-${header.maxZoom} | Connected`;
 
-        // If MapLibre already has the source/layer, remove them to re-bind
+        // Clean existing ortho layers if switching gateways
         if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
         if (map.getSource('ortho-pmtiles-source')) map.removeSource('ortho-pmtiles-source');
 
-        const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
-
+        // Add Drone PMTiles Raster Source
         map.addSource('ortho-pmtiles-source', {
           type: 'raster',
           url: pmtilesProtocolUrl,
@@ -327,33 +360,40 @@
           maxzoom: header.maxZoom
         });
 
+        // Insert Drone Ortho immediately above OpenStreetMap basemap
         map.addLayer({
           id: 'ortho-pmtiles-layer',
           type: 'raster',
           source: 'ortho-pmtiles-source',
           paint: {
             'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
-            'raster-fade-duration': 100
+            'raster-fade-duration': 100,
+            // Subtly lift shadows to avoid zero-alpha black edges bleeding into the base
+            'raster-brightness-min': 0.02
           }
-        }, beforeLayerId);
+        });
 
-        // Auto-center camera over the drone orthomosaic bounds
+        // Add Black Collar Inverted Mask to cleanly clip non-imagery black bounds
+        setupCollarClippingMask(header);
+
+        // Add OSM Streets & Labels Overlay ON TOP of the Drone Ortho
+        ensureOsmOverlayLayer();
+
+        // Auto fly to the drone imagery boundaries
         if (header.minLon && header.maxLon && header.minLon !== header.maxLon) {
           map.fitBounds(orthoBounds, {
             padding: 40,
-            pitch: 55,
+            pitch: 52,
             duration: 1800,
-            maxZoom: 19
+            maxZoom: 18.5
           });
         }
       } catch (err) {
-        console.warn("Direct PMTiles header read failed, falling back to standard source registration:", err);
-        statusIndicator.innerText = "Streaming via default range...";
+        console.warn("Direct PMTiles header inspection failed:", err);
+        statusIndicator.innerText = "Active (Direct Stream)";
 
         if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
         if (map.getSource('ortho-pmtiles-source')) map.removeSource('ortho-pmtiles-source');
-
-        const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
 
         map.addSource('ortho-pmtiles-source', {
           type: 'raster',
@@ -368,16 +408,220 @@
           paint: {
             'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100
           }
-        }, beforeLayerId);
+        });
+
+        ensureOsmOverlayLayer();
       }
     }
 
+    // Creates an inward polygonal frame that clips out the black border padding
+    function setupCollarClippingMask(header) {
+      if (map.getLayer('collar-clip-mask')) map.removeLayer('collar-clip-mask');
+      if (map.getSource('collar-clip-source')) map.removeSource('collar-clip-source');
+
+      const lonSpan = header.maxLon - header.minLon;
+      const latSpan = header.maxLat - header.minLat;
+
+      // Inset bounding box by ~1.5% to discard uncalibrated black borders on rotation
+      const insetLon = lonSpan * 0.015;
+      const insetLat = latSpan * 0.015;
+
+      const innerBox = [
+        [header.minLon + insetLon, header.minLat + insetLat],
+        [header.maxLon - insetLon, header.minLat + insetLat],
+        [header.maxLon - insetLon, header.maxLat - insetLat],
+        [header.minLon + insetLon, header.maxLat - insetLat],
+        [header.minLon + insetLon, header.minLat + insetLat]
+      ];
+
+      // Inverted Donut Polygon: Outer globe minus inside active bounds
+      const worldDonut = {
+        "type": "Feature",
+        "geometry": {
+          "type": "Polygon",
+          "coordinates": [
+            [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], // Outer world
+            innerBox // Inner drone cutout
+          ]
+        }
+      };
+
+      map.addSource('collar-clip-source', {
+        type: 'geojson',
+        data: worldDonut
+      });
+
+      // Mask layer draws transparent basemap tint outside imagery bounds to clean collars
+      map.addLayer({
+        id: 'collar-clip-mask',
+        type: 'fill',
+        source: 'collar-clip-source',
+        paint: {
+          'fill-color': '#0f172a',
+          'fill-opacity': 0.0 // Kept transparent by default, toggleable
+        }
+      });
+    }
+
+    // Overlay containing OSM roads, street names and labels placed over drone imagery
+    function ensureOsmOverlayLayer() {
+      if (map.getSource('osm-overlay-source')) return;
+
+      map.addSource('osm-overlay-source', {
+        type: 'raster',
+        tiles: [
+          'https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
+          'https://b.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
+          'https://c.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png'
+        ],
+        tileSize: 256,
+        maxzoom: 20
+      });
+
+      map.addLayer({
+        id: 'osm-overlay-layer',
+        type: 'raster',
+        source: 'osm-overlay-source',
+        paint: {
+          'raster-opacity': parseFloat(document.getElementById('slider-osm-opacity').value) / 100
+        }
+      });
+    }
+
     // =========================================================================
-    // 5. Fetch & Extrude GeoJSON Buildings with Heights
+    // 5. Fetch & Extrude 3D Building Vectors
     // =========================================================================
-    // 3. MapLibre GL JS Initialization
+    async function loadBuildingFootprints() {
+      setLoading(true, "Downloading building vectors from IPFS...");
+      
+      const candidateCids = [CIDS.buildingsWithHeights, CIDS.buildingsFootprints, CIDS.buildingsRaw];
+      let loaded = false;
+
+      for (const cid of candidateCids) {
+        const url = getIpfsUrl(cid);
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) continue;
+          buildingsGeojsonData = await resp.json();
+          loaded = true;
+          break;
+        } catch (err) {
+          console.warn(`Gateway fetch failed for ${cid}, trying fallback...`, err);
+        }
+      }
+
+      if (!loaded || !buildingsGeojsonData || !buildingsGeojsonData.features) {
+        setLoading(false);
+        showToast("Gateway timeout or CORS restriction on current IPFS node. Switch gateways above.", true);
+        return;
+      }
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      let count = 0, totalH = 0, maxH = 0;
+
+      buildingsGeojsonData.features.forEach((feat, index) => {
+        if (!feat.id) feat.id = index + 1;
+        const props = feat.properties || {};
+        
+        const hMax = Number(props.h_max ?? props.max_height ?? props.height ?? 3.5);
+        const hMean = Number(props.h_mean ?? props.mean_height ?? props.avg_height ?? (hMax * 0.85));
+        
+        props._calc_h_max = hMax > 0 ? hMax : 3.0;
+        props._calc_h_mean = hMean > 0 ? hMean : 2.5;
+
+        count++;
+        totalH += props._calc_h_mean;
+        if (props._calc_h_max > maxH) maxH = props._calc_h_max;
+
+        const scanCoords = (coords) => {
+          if (typeof coords[0] === 'number') {
+            const [lng, lat] = coords;
+            if (lng < minX) minX = lng;
+            if (lng > maxX) maxX = lng;
+            if (lat < minY) minY = lat;
+            if (lat > maxY) maxY = lat;
+          } else {
+            coords.forEach(scanCoords);
+          }
+        };
+        if (feat.geometry && feat.geometry.coordinates) {
+          scanCoords(feat.geometry.coordinates);
+        }
+      });
+
+      document.getElementById('stat-count').innerText = count.toLocaleString();
+      document.getElementById('stat-max').innerText = `${maxH.toFixed(1)} m`;
+      document.getElementById('stat-avg').innerText = count > 0 ? `${(totalH / count).toFixed(1)} m` : '--';
+
+      if (map.getSource('buildings-source')) {
+        map.getSource('buildings-source').setData(buildingsGeojsonData);
+      } else {
+        map.addSource('buildings-source', {
+          type: 'geojson',
+          data: buildingsGeojsonData,
+          generateId: true
+        });
+
+        // Extruded 3D Buildings positioned above the drone raster
+        map.addLayer({
+          id: 'buildings-extruded',
+          type: 'fill-extrusion',
+          source: 'buildings-source',
+          paint: {
+            'fill-extrusion-height': [
+              '*',
+              ['coalesce', ['get', '_calc_h_max'], 3.0],
+              heightMultiplier
+            ],
+            'fill-extrusion-base': 0,
+            'fill-extrusion-color': getBuildingColorExpression(),
+            'fill-extrusion-opacity': 0.88
+          }
+        });
+
+        // Building Outline Borders for sharp delineation
+        map.addLayer({
+          id: 'buildings-outline',
+          type: 'line',
+          source: 'buildings-source',
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 1.2,
+            'line-opacity': 0.5
+          }
+        });
+      }
+
+      setLoading(false);
+    }
+
+    function getBuildingColorExpression() {
+      if (buildingColorMode === 'mono') {
+        return '#e2e8f0';
+      }
+      return [
+        'interpolate',
+        ['linear'],
+        ['coalesce', ['get', '_calc_h_max'], 3.0],
+        2.5, '#38bdf8',
+        5.5, '#34d399',
+        11.0, '#fbbf24',
+        22.0, '#f87171'
+      ];
+    }
+
+    function updateBuildingStyle() {
+      if (!map.getLayer('buildings-extruded')) return;
+      map.setPaintProperty('buildings-extruded', 'fill-extrusion-color', getBuildingColorExpression());
+      map.setPaintProperty('buildings-extruded', 'fill-extrusion-height', [
+        '*',
+        ['coalesce', ['get', '_calc_h_max'], 3.0],
+        heightMultiplier
+      ]);
+    }
+
     // =========================================================================
-    // 6. Event Listeners & Controls
+    // 6. Event Listeners & Interaction
     // =========================================================================
     map.on('load', () => {
       loadPMTilesRasterLayer();
@@ -413,16 +657,16 @@
       map.on('mouseleave', 'buildings-extruded', () => map.getCanvas().style.cursor = '');
     });
 
-    // Recenter Button
+    // Recenter View
     document.getElementById('btn-recenter').addEventListener('click', () => {
       if (orthoBounds) {
-        map.fitBounds(orthoBounds, { padding: 50, pitch: 55, duration: 1500 });
+        map.fitBounds(orthoBounds, { padding: 50, pitch: 52, duration: 1500 });
       } else if (buildingsGeojsonData) {
         loadBuildingFootprints();
       }
     });
 
-    // Gateway Selector Change
+    // Gateway Selector
     document.getElementById('gateway-selector').addEventListener('change', (e) => {
       activeGateway = e.target.value;
       showToast(`Switched gateway to: ${new URL(activeGateway).hostname}`);
@@ -430,7 +674,7 @@
       loadBuildingFootprints();
     });
 
-    // Layer Visibility & Opacity Controls
+    // Drone Ortho Toggle & Opacity
     document.getElementById('toggle-ortho').addEventListener('change', (e) => {
       if (map.getLayer('ortho-pmtiles-layer')) {
         map.setLayoutProperty('ortho-pmtiles-layer', 'visibility', e.target.checked ? 'visible' : 'none');
@@ -443,13 +687,34 @@
       }
     });
 
+    // Collar Clip Toggle
+    document.getElementById('toggle-collar-clip').addEventListener('change', (e) => {
+      if (map.getLayer('ortho-pmtiles-layer')) {
+        // If clipped, slightly trim brightness floor so black nodata turns transparent
+        map.setPaintProperty('ortho-pmtiles-layer', 'raster-brightness-min', e.target.checked ? 0.05 : 0.0);
+      }
+    });
+
+    // OSM Overlay Toggle & Opacity
+    document.getElementById('toggle-osm-overlay').addEventListener('change', (e) => {
+      if (map.getLayer('osm-overlay-layer')) {
+        map.setLayoutProperty('osm-overlay-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+      }
+    });
+
+    document.getElementById('slider-osm-opacity').addEventListener('input', (e) => {
+      if (map.getLayer('osm-overlay-layer')) {
+        map.setPaintProperty('osm-overlay-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
+      }
+    });
+
+    // 3D Buildings Toggle & Slider
     document.getElementById('toggle-buildings').addEventListener('change', (e) => {
       const vis = e.target.checked ? 'visible' : 'none';
       if (map.getLayer('buildings-extruded')) map.setLayoutProperty('buildings-extruded', 'visibility', vis);
       if (map.getLayer('buildings-outline')) map.setLayoutProperty('buildings-outline', 'visibility', vis);
     });
 
-    // Height Scale Exaggeration
     document.getElementById('slider-height-scale').addEventListener('input', (e) => {
       heightMultiplier = parseFloat(e.target.value);
       document.getElementById('label-height-scale').innerText = `${heightMultiplier.toFixed(1)}x`;
