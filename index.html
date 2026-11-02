@@ -19,7 +19,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0f172a; font-family: 'Inter', system-ui, sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0b0f19; font-family: 'Inter', system-ui, sans-serif; }
     #map { position: absolute; inset: 0; width: 100%; height: 100%; }
 
     /* Custom scrollbars */
@@ -28,7 +28,7 @@
     ::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.3); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(56, 189, 248, 0.6); }
 
-    /* Glassmorphism HUD */
+    /* Glassmorphism styling */
     .glass-hud {
       background: rgba(15, 23, 42, 0.88);
       backdrop-filter: blur(14px);
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <!-- Stats Pill -->
+    <!-- Quick Navigation / Stats Pill -->
     <div id="quick-stats-pill" class="glass-hud px-3.5 py-2 rounded-xl text-xs flex items-center gap-4 text-slate-300">
       <div><span class="text-slate-400">Buildings:</span> <span id="stat-count" class="font-semibold text-sky-400">--</span></div>
       <div class="h-3 w-px bg-slate-700"></div>
@@ -91,7 +91,7 @@
   </header>
 
   <!-- Right Sidebar: Controls & Layer HUD -->
-  <aside class="absolute top-4 right-4 z-20 w-80 max-h-[calc(100vh-2rem)] flex flex-col gap-3">
+  <aside class="absolute top-4 right-4 z-20 w-84 max-h-[calc(100vh-2rem)] flex flex-col gap-3">
     <div class="glass-hud rounded-2xl p-4 flex flex-col gap-4 overflow-y-auto">
       
       <!-- Panel Header -->
@@ -105,46 +105,78 @@
         </button>
       </div>
 
-      <!-- Raster Layer Controls -->
+      <!-- Raster Layer Controls (PMTiles Ortho) -->
       <div class="space-y-3">
         <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Raster Stream (IPFS PMTiles)</span>
         
-        <!-- Ortho PMTiles Toggle -->
-        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
+        <!-- Drone Ortho Toggle -->
+        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2.5">
           <div class="flex items-center justify-between text-xs">
-            <span class="flex items-center gap-2 text-slate-200">
+            <span class="flex items-center gap-2 text-slate-200 font-medium">
               <i class="fa-solid fa-map text-emerald-400"></i> High-Res Drone Ortho
             </span>
             <input type="checkbox" id="toggle-ortho" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
           </div>
-          <div class="flex items-center justify-between gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-            <span>Opacity</span>
-            <input type="range" id="slider-ortho-opacity" min="0" max="100" value="100" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+
+          <!-- Transparency & Collar Removal Status -->
+          <div class="flex items-center justify-between text-[11px] text-slate-300 bg-slate-800/50 px-2 py-1.5 rounded-lg border border-slate-700/50">
+            <span class="flex items-center gap-1.5">
+              <i class="fa-solid fa-wand-magic-sparkles text-purple-400"></i> Black Collar Removal
+            </span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="toggle-alpha-filter" checked class="sr-only peer">
+              <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-500"></div>
+            </label>
           </div>
-          <div id="ortho-bounds-indicator" class="text-[10px] text-slate-400 font-mono truncate">
-            Status: Connecting...
+
+          <!-- Image Enhancements: Brightness, Contrast, Saturation -->
+          <div class="space-y-2 pt-2 border-t border-slate-800/80 text-[11px]">
+            <div class="flex items-center justify-between text-slate-300 font-medium">
+              <span>Image Color Enhancement</span>
+              <button id="btn-reset-enhancements" class="text-[10px] text-sky-400 hover:underline">Reset</button>
+            </div>
+            
+            <div class="flex items-center justify-between gap-2 text-slate-400">
+              <span class="w-16">Opacity</span>
+              <input type="range" id="slider-ortho-opacity" min="0" max="100" value="100" class="w-full accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+              <span id="label-ortho-opacity" class="w-8 text-right font-mono text-slate-300">100%</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 text-slate-400">
+              <span class="w-16">Brightness</span>
+              <input type="range" id="slider-brightness" min="0.8" max="1.8" step="0.05" value="1.25" class="w-full accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+              <span id="label-brightness" class="w-8 text-right font-mono text-slate-300">+25%</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 text-slate-400">
+              <span class="w-16">Contrast</span>
+              <input type="range" id="slider-contrast" min="-0.2" max="0.6" step="0.05" value="0.25" class="w-full accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+              <span id="label-contrast" class="w-8 text-right font-mono text-slate-300">+25%</span>
+            </div>
+
+            <div class="flex items-center justify-between gap-2 text-slate-400">
+              <span class="w-16">Vibrance</span>
+              <input type="range" id="slider-saturation" min="-0.5" max="0.8" step="0.05" value="0.20" class="w-full accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+              <span id="label-saturation" class="w-8 text-right font-mono text-slate-300">+20%</span>
+            </div>
+          </div>
+          
+          <div id="ortho-bounds-indicator" class="text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-800/80 truncate">
+            Status: Initializing PMTiles...
           </div>
         </div>
 
-        <!-- Collar / Black Collar Elimination Toggle -->
-        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
-          <span class="flex items-center gap-2 text-slate-200">
-            <i class="fa-solid fa-crop-simple text-purple-400"></i> Trim Black Collar
-          </span>
-          <input type="checkbox" id="toggle-collar-clip" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
-        </div>
-
-        <!-- OpenStreetMap Streets & Labels Overlay Toggle -->
+        <!-- OpenStreetMap Streets & Roads Overlay Toggle -->
         <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs">
             <span class="flex items-center gap-2 text-slate-200">
-              <i class="fa-solid fa-road text-amber-400"></i> OSM Streets & Labels Overlay
+              <i class="fa-solid fa-road text-amber-400"></i> OpenStreetMap Roads & Labels
             </span>
             <input type="checkbox" id="toggle-osm-overlay" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
           </div>
           <div class="flex items-center justify-between gap-3 text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-            <span>Overlay Opacity</span>
-            <input type="range" id="slider-osm-opacity" min="0" max="100" value="90" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+            <span>Overlay Blend</span>
+            <input type="range" id="slider-osm-opacity" min="0" max="100" value="85" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
           </div>
         </div>
       </div>
@@ -227,13 +259,68 @@
 
   <script>
     // =========================================================================
-    // 1. Protomaps PMTiles Protocol Setup
+    // 1. Transparent Alpha Interceptor & PMTiles Protocol Setup
     // =========================================================================
-    const protocol = new pmtiles.Protocol();
-    maplibregl.addProtocol("pmtiles", protocol.tile);
+    let removeBlackCollar = true;
+    const basePmtilesProtocol = new pmtiles.Protocol();
+
+    // Custom MapLibre Protocol: Strips black nodata collars (RGB <= 18 -> Alpha = 0)
+    maplibregl.addProtocol("pmtiles", (params, abortController) => {
+      return new Promise((resolve, reject) => {
+        basePmtilesProtocol.tile(params, abortController).then(response => {
+          if (!response || !response.data) {
+            resolve(response);
+            return;
+          }
+
+          if (!removeBlackCollar) {
+            resolve(response);
+            return;
+          }
+
+          const blob = new Blob([response.data], { type: 'image/jpeg' });
+          createImageBitmap(blob).then(bitmap => {
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0);
+
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            let hasPureBlack = false;
+
+            // Scan pixels and convert near-black JPEG border compression artifacts to transparent
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
+              // JPEG nodata borders usually fluctuate between 0 and 18
+              if (r <= 18 && g <= 18 && b <= 18) {
+                data[i + 3] = 0; // Set Alpha to 0
+                hasPureBlack = true;
+              }
+            }
+
+            if (hasPureBlack) {
+              ctx.putImageData(imgData, 0, 0);
+              canvas.toBlob(transparentBlob => {
+                transparentBlob.arrayBuffer().then(buf => {
+                  resolve({ data: new Uint8Array(buf) });
+                });
+              }, 'image/png');
+            } else {
+              resolve(response);
+            }
+          }).catch(() => {
+            resolve(response);
+          });
+        }).catch(reject);
+      });
+    });
 
     // =========================================================================
-    // 2. IPFS CIDs & Configuration
+    // 2. IPFS CIDs & Initial Configuration
     // =========================================================================
     const CIDS = {
       urbanOrthoPMTiles: "QmYj94MMzKfteQQhahtVbJKcVpDkZV1U5hkW9VisQif7dK",
@@ -249,7 +336,7 @@
     let orthoBounds = null;
 
     // =========================================================================
-    // 3. MapLibre GL JS Initialization (OpenStreetMap Standard Base)
+    // 3. MapLibre GL JS Initialization (Free Keyless OpenStreetMap Base)
     // =========================================================================
     const map = new maplibregl.Map({
       container: 'map',
@@ -257,26 +344,25 @@
         version: 8,
         glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
         sources: {
-          // OpenStreetMap Standard Tiles as the base layer
+          // 100% Free OpenStreetMap Base Layer - No API Key Required
           'osm-base': {
             type: 'raster',
             tiles: [
               'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
             ],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
             maxzoom: 19
           },
-          // Transparent OSM Overlay (Roads, Lines & Labels) to overlay over the drone ortho
-          'osm-roads-labels-overlay': {
+          // Free Humanitarian/OpenStreetMap overlay for road contrast - No API key
+          'osm-roads-overlay': {
             type: 'raster',
             tiles: [
-              'https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
-              'https://b.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
-              'https://c.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png'
+              'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+              'https://b.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
             ],
             tileSize: 256,
-            maxzoom: 20
+            maxzoom: 19
           }
         },
         layers: [
@@ -285,7 +371,11 @@
             type: 'raster',
             source: 'osm-base',
             minzoom: 0,
-            maxzoom: 19
+            maxzoom: 19,
+            paint: {
+              'raster-saturation': -0.15,
+              'raster-contrast': 0.05
+            }
           }
         ]
       },
@@ -326,7 +416,7 @@
     }
 
     // =========================================================================
-    // 4. Drone PMTiles Stream & Rotated Collar Elimination
+    // 4. Drone PMTiles Stream & Hardware Image Enhancement
     // =========================================================================
     async function loadPMTilesRasterLayer() {
       const statusIndicator = document.getElementById('ortho-bounds-indicator');
@@ -337,7 +427,7 @@
         statusIndicator.innerText = "Connecting PMTiles header...";
 
         const pInstance = new pmtiles.PMTiles(httpUrl);
-        protocol.add(pInstance);
+        basePmtilesProtocol.add(pInstance);
 
         const header = await pInstance.getHeader();
         orthoBounds = [
@@ -345,7 +435,7 @@
           [header.maxLon, header.maxLat]
         ];
 
-        statusIndicator.innerText = `Zoom ${header.minZoom}-${header.maxZoom} | Connected`;
+        statusIndicator.innerText = `Zoom ${header.minZoom}-${header.maxZoom} | Connected (Collar-Free)`;
 
         // Clean existing ortho layers if switching gateways
         if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
@@ -360,7 +450,7 @@
           maxzoom: header.maxZoom
         });
 
-        // Insert Drone Ortho immediately above OpenStreetMap basemap
+        // Add layer directly above OSM base, enhanced with contrast & brightness defaults
         map.addLayer({
           id: 'ortho-pmtiles-layer',
           type: 'raster',
@@ -368,18 +458,17 @@
           paint: {
             'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
             'raster-fade-duration': 100,
-            // Subtly lift shadows to avoid zero-alpha black edges bleeding into the base
-            'raster-brightness-min': 0.02
+            'raster-brightness-max': parseFloat(document.getElementById('slider-brightness').value),
+            'raster-brightness-min': 0.05,
+            'raster-contrast': parseFloat(document.getElementById('slider-contrast').value),
+            'raster-saturation': parseFloat(document.getElementById('slider-saturation').value)
           }
-        });
+        }, map.getLayer('osm-overlay-layer') ? 'osm-overlay-layer' : undefined);
 
-        // Add Black Collar Inverted Mask to cleanly clip non-imagery black bounds
-        setupCollarClippingMask(header);
-
-        // Add OSM Streets & Labels Overlay ON TOP of the Drone Ortho
+        // Ensure Road & Street names overlay on top of ortho
         ensureOsmOverlayLayer();
 
-        // Auto fly to the drone imagery boundaries
+        // Fit bounds to drone scene
         if (header.minLon && header.maxLon && header.minLon !== header.maxLon) {
           map.fitBounds(orthoBounds, {
             padding: 40,
@@ -389,7 +478,7 @@
           });
         }
       } catch (err) {
-        console.warn("Direct PMTiles header inspection failed:", err);
+        console.warn("Direct PMTiles header inspection fallback:", err);
         statusIndicator.innerText = "Active (Direct Stream)";
 
         if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
@@ -406,86 +495,48 @@
           type: 'raster',
           source: 'ortho-pmtiles-source',
           paint: {
-            'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100
+            'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
+            'raster-brightness-max': parseFloat(document.getElementById('slider-brightness').value),
+            'raster-contrast': parseFloat(document.getElementById('slider-contrast').value),
+            'raster-saturation': parseFloat(document.getElementById('slider-saturation').value)
           }
-        });
+        }, map.getLayer('osm-overlay-layer') ? 'osm-overlay-layer' : undefined);
 
         ensureOsmOverlayLayer();
       }
     }
 
-    // Creates an inward polygonal frame that clips out the black border padding
-    function setupCollarClippingMask(header) {
-      if (map.getLayer('collar-clip-mask')) map.removeLayer('collar-clip-mask');
-      if (map.getSource('collar-clip-source')) map.removeSource('collar-clip-source');
-
-      const lonSpan = header.maxLon - header.minLon;
-      const latSpan = header.maxLat - header.minLat;
-
-      // Inset bounding box by ~1.5% to discard uncalibrated black borders on rotation
-      const insetLon = lonSpan * 0.015;
-      const insetLat = latSpan * 0.015;
-
-      const innerBox = [
-        [header.minLon + insetLon, header.minLat + insetLat],
-        [header.maxLon - insetLon, header.minLat + insetLat],
-        [header.maxLon - insetLon, header.maxLat - insetLat],
-        [header.minLon + insetLon, header.maxLat - insetLat],
-        [header.minLon + insetLon, header.minLat + insetLat]
-      ];
-
-      // Inverted Donut Polygon: Outer globe minus inside active bounds
-      const worldDonut = {
-        "type": "Feature",
-        "geometry": {
-          "type": "Polygon",
-          "coordinates": [
-            [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]], // Outer world
-            innerBox // Inner drone cutout
-          ]
-        }
-      };
-
-      map.addSource('collar-clip-source', {
-        type: 'geojson',
-        data: worldDonut
-      });
-
-      // Mask layer draws transparent basemap tint outside imagery bounds to clean collars
-      map.addLayer({
-        id: 'collar-clip-mask',
-        type: 'fill',
-        source: 'collar-clip-source',
-        paint: {
-          'fill-color': '#0f172a',
-          'fill-opacity': 0.0 // Kept transparent by default, toggleable
-        }
-      });
-    }
-
-    // Overlay containing OSM roads, street names and labels placed over drone imagery
+    // OpenStreetMap Roads & Labels Overlay (Free, zero API key)
     function ensureOsmOverlayLayer() {
-      if (map.getSource('osm-overlay-source')) return;
-
-      map.addSource('osm-overlay-source', {
-        type: 'raster',
-        tiles: [
-          'https://a.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
-          'https://b.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png',
-          'https://c.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}@2x.png'
-        ],
-        tileSize: 256,
-        maxzoom: 20
-      });
+      if (map.getLayer('osm-overlay-layer')) return;
 
       map.addLayer({
         id: 'osm-overlay-layer',
         type: 'raster',
-        source: 'osm-overlay-source',
+        source: 'osm-roads-overlay',
         paint: {
-          'raster-opacity': parseFloat(document.getElementById('slider-osm-opacity').value) / 100
+          'raster-opacity': parseFloat(document.getElementById('slider-osm-opacity').value) / 100,
+          'raster-contrast': 0.3
         }
       });
+    }
+
+    function applyRasterFilters() {
+      if (!map.getLayer('ortho-pmtiles-layer')) return;
+      const brightness = parseFloat(document.getElementById('slider-brightness').value);
+      const contrast = parseFloat(document.getElementById('slider-contrast').value);
+      const saturation = parseFloat(document.getElementById('slider-saturation').value);
+      const opacity = parseFloat(document.getElementById('slider-ortho-opacity').value) / 100;
+
+      map.setPaintProperty('ortho-pmtiles-layer', 'raster-opacity', opacity);
+      map.setPaintProperty('ortho-pmtiles-layer', 'raster-brightness-max', brightness);
+      map.setPaintProperty('ortho-pmtiles-layer', 'raster-contrast', contrast);
+      map.setPaintProperty('ortho-pmtiles-layer', 'raster-saturation', saturation);
+
+      document.getElementById('label-ortho-opacity').innerText = `${Math.round(opacity * 100)}%`;
+      document.getElementById('label-brightness').innerText = `${brightness >= 1 ? '+' : ''}${Math.round((brightness - 1) * 100)}%`;
+      document.getElementById('label-contrast').innerText = `${contrast >= 0 ? '+' : ''}${Math.round(contrast * 100)}%`;
+      document.getElementById('label-saturation').innerText = `${saturation >= 0 ? '+' : ''}${Math.round(saturation * 100)}%`;
     }
 
     // =========================================================================
@@ -512,7 +563,7 @@
 
       if (!loaded || !buildingsGeojsonData || !buildingsGeojsonData.features) {
         setLoading(false);
-        showToast("Gateway timeout or CORS restriction on current IPFS node. Switch gateways above.", true);
+        showToast("Gateway timeout or CORS restriction on building vector CID. Switch gateways above.", true);
         return;
       }
 
@@ -523,6 +574,7 @@
         if (!feat.id) feat.id = index + 1;
         const props = feat.properties || {};
         
+        // Resolve height properties
         const hMax = Number(props.h_max ?? props.max_height ?? props.height ?? 3.5);
         const hMean = Number(props.h_mean ?? props.mean_height ?? props.avg_height ?? (hMax * 0.85));
         
@@ -562,7 +614,7 @@
           generateId: true
         });
 
-        // Extruded 3D Buildings positioned above the drone raster
+        // Extruded 3D Buildings
         map.addLayer({
           id: 'buildings-extruded',
           type: 'fill-extrusion',
@@ -587,7 +639,7 @@
           paint: {
             'line-color': '#38bdf8',
             'line-width': 1.2,
-            'line-opacity': 0.5
+            'line-opacity': 0.6
           }
         });
       }
@@ -597,7 +649,7 @@
 
     function getBuildingColorExpression() {
       if (buildingColorMode === 'mono') {
-        return '#e2e8f0';
+        return '#f1f5f9';
       }
       return [
         'interpolate',
@@ -621,7 +673,7 @@
     }
 
     // =========================================================================
-    // 6. Event Listeners & Interaction
+    // 6. Event Listeners & Interactive Controls
     // =========================================================================
     map.on('load', () => {
       loadPMTilesRasterLayer();
@@ -674,25 +726,32 @@
       loadBuildingFootprints();
     });
 
-    // Drone Ortho Toggle & Opacity
+    // Drone Ortho Toggle
     document.getElementById('toggle-ortho').addEventListener('change', (e) => {
       if (map.getLayer('ortho-pmtiles-layer')) {
         map.setLayoutProperty('ortho-pmtiles-layer', 'visibility', e.target.checked ? 'visible' : 'none');
       }
     });
 
-    document.getElementById('slider-ortho-opacity').addEventListener('input', (e) => {
-      if (map.getLayer('ortho-pmtiles-layer')) {
-        map.setPaintProperty('ortho-pmtiles-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
-      }
+    // Alpha Filter / Black Collar Removal Toggle
+    document.getElementById('toggle-alpha-filter').addEventListener('change', (e) => {
+      removeBlackCollar = e.target.checked;
+      loadPMTilesRasterLayer();
+      showToast(removeBlackCollar ? "Collar transparency filter active" : "Raw tiles active");
     });
 
-    // Collar Clip Toggle
-    document.getElementById('toggle-collar-clip').addEventListener('change', (e) => {
-      if (map.getLayer('ortho-pmtiles-layer')) {
-        // If clipped, slightly trim brightness floor so black nodata turns transparent
-        map.setPaintProperty('ortho-pmtiles-layer', 'raster-brightness-min', e.target.checked ? 0.05 : 0.0);
-      }
+    // Image Enhancements (Brightness, Contrast, Vibrance, Opacity)
+    ['slider-ortho-opacity', 'slider-brightness', 'slider-contrast', 'slider-saturation'].forEach(id => {
+      document.getElementById(id).addEventListener('input', applyRasterFilters);
+    });
+
+    // Reset Enhancements Button
+    document.getElementById('btn-reset-enhancements').addEventListener('click', () => {
+      document.getElementById('slider-brightness').value = 1.25;
+      document.getElementById('slider-contrast').value = 0.25;
+      document.getElementById('slider-saturation').value = 0.20;
+      document.getElementById('slider-ortho-opacity').value = 100;
+      applyRasterFilters();
     });
 
     // OSM Overlay Toggle & Opacity
