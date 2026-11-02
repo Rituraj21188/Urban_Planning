@@ -12,8 +12,8 @@
   <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
   <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
 
-  <!-- Protomaps PMTiles JS Protocol -->
-  <script src="https://unpkg.com/pmtiles@2.11.0/dist/index.js"></script>
+  <!-- Protomaps PMTiles JS Protocol (v3.0.7 for full MapLibre v4 compatibility) -->
+  <script src="https://unpkg.com/pmtiles@3.0.7/dist/pmtiles.js"></script>
 
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -113,7 +113,7 @@
         <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs">
             <span class="flex items-center gap-2 text-slate-200">
-              <i class="fa-solid fa-map text-emerald-400"></i> Urban Ortho PMTiles
+              <i class="fa-solid fa-map text-emerald-400"></i> High-Res Drone Orthomosaic
             </span>
             <input type="checkbox" id="toggle-ortho" checked class="accent-sky-400 w-4 h-4 cursor-pointer" />
           </div>
@@ -121,23 +121,8 @@
             <span>Opacity</span>
             <input type="range" id="slider-ortho-opacity" min="0" max="100" value="100" class="w-32 accent-sky-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
           </div>
-        </div>
-
-        <!-- Elevation Raster Switcher (DSM / DTM) -->
-        <div class="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 flex flex-col gap-2">
-          <div class="flex items-center justify-between text-xs">
-            <span class="flex items-center gap-2 text-slate-200">
-              <i class="fa-solid fa-mountain-sun text-amber-400"></i> Elevation Overlay
-            </span>
-            <input type="checkbox" id="toggle-elevation" class="accent-sky-400 w-4 h-4 cursor-pointer" />
-          </div>
-          <div class="flex items-center justify-between gap-2 text-[11px] pt-1 border-t border-slate-800/80">
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-              <input type="radio" name="elev-mode" value="dsm" checked class="accent-amber-400" /> DSM COG
-            </label>
-            <label class="flex items-center gap-1.5 cursor-pointer text-slate-300">
-              <input type="radio" name="elev-mode" value="dtm" class="accent-amber-400" /> DTM COG
-            </label>
+          <div id="ortho-bounds-indicator" class="text-[10px] text-slate-500 font-mono truncate">
+            Status: Connecting...
           </div>
         </div>
       </div>
@@ -230,8 +215,6 @@
     // =========================================================================
     const CIDS = {
       urbanOrthoPMTiles: "QmYj94MMzKfteQQhahtVbJKcVpDkZV1U5hkW9VisQif7dK",
-      dsmCOG: "QmXjtD6EZZZcUdMFxV2QWWkBbgPp28kxscyF6mj2FYRkm5",
-      dtmCOG: "QmfTFvWRHCurht3491seVBa5eGZ2utjCJP43usoJpTmRHN",
       buildingsWithHeights: "QmPtpP7bxxF1FTMy8vjwycSwRE69jaVC231seodtjD4SYd",
       buildingsFootprints: "QmPNJGorZ2XKUXuAem494duSfsLBQED79jW6abDNLivqSu",
       buildingsRaw: "QmcvdyAXAAdAZcvrsRR4kFJrKyCK1kTw85vwSXg3GLfM1R"
@@ -241,6 +224,7 @@
     let heightMultiplier = 1.0;
     let buildingColorMode = 'heat'; // 'heat' or 'mono'
     let buildingsGeojsonData = null;
+    let orthoBounds = null;
 
     // =========================================================================
     // 3. MapLibre GL JS Initialization
@@ -270,8 +254,8 @@
           }
         ]
       },
-      center: [91.647, 26.168], // Regional center, automatically adjusted on load
-      zoom: 15,
+      center: [91.6472, 26.1681], // Suburban cluster coordinates
+      zoom: 15.5,
       pitch: 58,
       bearing: -20,
       antialias: true
@@ -280,21 +264,8 @@
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
 
-    // =========================================================================
-    // 4. IPFS URL Resolvers
-    // =========================================================================
     function getIpfsUrl(cid) {
       return `${activeGateway}/${cid}`;
-    }
-
-    function getTiTilerUrl(cid, colormap = '') {
-      const rawUrl = getIpfsUrl(cid);
-      const encoded = encodeURIComponent(rawUrl);
-      let tileUrl = `https://titiler.xyz/cog/tiles/{z}/{x}/{y}.png?url=${encoded}`;
-      if (colormap) {
-        tileUrl += `&colormap_name=${colormap}`;
-      }
-      return tileUrl;
     }
 
     function showToast(message, isError = false) {
@@ -320,214 +291,96 @@
     }
 
     // =========================================================================
-    // 5. PMTiles & Elevation Layer Management
+    // 4. Robust PMTiles Direct Source Loader & Bounds Reader
     // =========================================================================
-    function reloadRasterLayers() {
-      const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
+    async function loadPMTilesRasterLayer() {
+      const statusIndicator = document.getElementById('ortho-bounds-indicator');
+      const httpUrl = getIpfsUrl(CIDS.urbanOrthoPMTiles);
+      const pmtilesProtocolUrl = `pmtiles://${httpUrl}`;
 
-      // 1. PMTiles Drone Orthomosaic Raster Stream
-      if (map.getSource('ortho-pmtiles-source')) {
+      try {
+        statusIndicator.innerText = "Connecting to PMTiles header...";
+
+        // Inspect header and bounds via PMTiles JS client directly
+        const pInstance = new pmtiles.PMTiles(httpUrl);
+        protocol.add(pInstance);
+
+        const header = await pInstance.getHeader();
+        orthoBounds = [
+          [header.minLon, header.minLat],
+          [header.maxLon, header.maxLat]
+        ];
+
+        statusIndicator.innerText = `Zoom ${header.minZoom}-${header.maxZoom} | Active`;
+
+        // If MapLibre already has the source/layer, remove them to re-bind
         if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
-        map.removeSource('ortho-pmtiles-source');
-      }
+        if (map.getSource('ortho-pmtiles-source')) map.removeSource('ortho-pmtiles-source');
 
-      const pmtilesUrl = `pmtiles://${getIpfsUrl(CIDS.urbanOrthoPMTiles)}`;
+        const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
 
-      map.addSource('ortho-pmtiles-source', {
-        type: 'raster',
-        url: pmtilesUrl,
-        tileSize: 256
-      });
-
-      map.addLayer({
-        id: 'ortho-pmtiles-layer',
-        type: 'raster',
-        source: 'ortho-pmtiles-source',
-        paint: {
-          'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
-          'raster-fade-duration': 150
-        }
-      }, beforeLayerId);
-
-      // 2. Elevation Raster Overlay (DSM/DTM via TiTiler)
-      const isElevActive = document.getElementById('toggle-elevation').checked;
-      const elevMode = document.querySelector('input[name="elev-mode"]:checked').value;
-      const elevCid = elevMode === 'dsm' ? CIDS.dsmCOG : CIDS.dtmCOG;
-
-      if (map.getSource('elevation-cog-source')) {
-        if (map.getLayer('elevation-cog-layer')) map.removeLayer('elevation-cog-layer');
-        map.removeSource('elevation-cog-source');
-      }
-
-      if (isElevActive) {
-        map.addSource('elevation-cog-source', {
+        map.addSource('ortho-pmtiles-source', {
           type: 'raster',
-          tiles: [getTiTilerUrl(elevCid, 'terrain')],
+          url: pmtilesProtocolUrl,
+          tileSize: 256,
+          minzoom: header.minZoom,
+          maxzoom: header.maxZoom
+        });
+
+        map.addLayer({
+          id: 'ortho-pmtiles-layer',
+          type: 'raster',
+          source: 'ortho-pmtiles-source',
+          paint: {
+            'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100,
+            'raster-fade-duration': 100
+          }
+        }, beforeLayerId);
+
+        // Auto-center camera over the drone orthomosaic bounds
+        if (header.minLon && header.maxLon && header.minLon !== header.maxLon) {
+          map.fitBounds(orthoBounds, {
+            padding: 40,
+            pitch: 55,
+            duration: 1800,
+            maxZoom: 19
+          });
+        }
+      } catch (err) {
+        console.warn("Direct PMTiles header read failed, falling back to standard source registration:", err);
+        statusIndicator.innerText = "Streaming via default range...";
+
+        if (map.getLayer('ortho-pmtiles-layer')) map.removeLayer('ortho-pmtiles-layer');
+        if (map.getSource('ortho-pmtiles-source')) map.removeSource('ortho-pmtiles-source');
+
+        const beforeLayerId = map.getLayer('buildings-extruded') ? 'buildings-extruded' : undefined;
+
+        map.addSource('ortho-pmtiles-source', {
+          type: 'raster',
+          url: pmtilesProtocolUrl,
           tileSize: 256
         });
 
         map.addLayer({
-          id: 'elevation-cog-layer',
+          id: 'ortho-pmtiles-layer',
           type: 'raster',
-          source: 'elevation-cog-source',
+          source: 'ortho-pmtiles-source',
           paint: {
-            'raster-opacity': 0.75
+            'raster-opacity': parseFloat(document.getElementById('slider-ortho-opacity').value) / 100
           }
         }, beforeLayerId);
       }
     }
 
     // =========================================================================
-    // 6. Fetch & Extrude GeoJSON Buildings with Heights
+    // 5. Fetch & Extrude GeoJSON Buildings with Heights
     // =========================================================================
-    async function loadBuildingFootprints() {
-      setLoading(true, "Downloading building vectors from IPFS...");
-      
-      const candidateCids = [CIDS.buildingsWithHeights, CIDS.buildingsFootprints, CIDS.buildingsRaw];
-      let loaded = false;
-
-      for (const cid of candidateCids) {
-        const url = getIpfsUrl(cid);
-        try {
-          const resp = await fetch(url);
-          if (!resp.ok) continue;
-          buildingsGeojsonData = await resp.json();
-          loaded = true;
-          break;
-        } catch (err) {
-          console.warn(`Gateway fetch failed for ${cid}, trying fallback...`, err);
-        }
-      }
-
-      if (!loaded || !buildingsGeojsonData || !buildingsGeojsonData.features) {
-        setLoading(false);
-        showToast("Gateway timeout on vector GeoJSON. Try switching gateways.", true);
-        return;
-      }
-
-      // Compute bounds and stats
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      let count = 0, totalH = 0, maxH = 0;
-
-      buildingsGeojsonData.features.forEach((feat, index) => {
-        if (!feat.id) feat.id = index + 1;
-        const props = feat.properties || {};
-        
-        const hMax = Number(props.h_max ?? props.max_height ?? props.height ?? 3.5);
-        const hMean = Number(props.h_mean ?? props.mean_height ?? props.avg_height ?? (hMax * 0.85));
-        
-        props._calc_h_max = hMax > 0 ? hMax : 3.0;
-        props._calc_h_mean = hMean > 0 ? hMean : 2.5;
-
-        count++;
-        totalH += props._calc_h_mean;
-        if (props._calc_h_max > maxH) maxH = props._calc_h_max;
-
-        const scanCoords = (coords) => {
-          if (typeof coords[0] === 'number') {
-            const [lng, lat] = coords;
-            if (lng < minX) minX = lng;
-            if (lng > maxX) maxX = lng;
-            if (lat < minY) minY = lat;
-            if (lat > maxY) maxY = lat;
-          } else {
-            coords.forEach(scanCoords);
-          }
-        };
-        if (feat.geometry && feat.geometry.coordinates) {
-          scanCoords(feat.geometry.coordinates);
-        }
-      });
-
-      // Update HUD stats
-      document.getElementById('stat-count').innerText = count.toLocaleString();
-      document.getElementById('stat-max').innerText = `${maxH.toFixed(1)} m`;
-      document.getElementById('stat-avg').innerText = count > 0 ? `${(totalH / count).toFixed(1)} m` : '--';
-
-      if (map.getSource('buildings-source')) {
-        map.getSource('buildings-source').setData(buildingsGeojsonData);
-      } else {
-        map.addSource('buildings-source', {
-          type: 'geojson',
-          data: buildingsGeojsonData,
-          generateId: true
-        });
-
-        // 3D Extrusion Layer
-        map.addLayer({
-          id: 'buildings-extruded',
-          type: 'fill-extrusion',
-          source: 'buildings-source',
-          paint: {
-            'fill-extrusion-height': [
-              '*',
-              ['coalesce', ['get', '_calc_h_max'], 3.0],
-              heightMultiplier
-            ],
-            'fill-extrusion-base': 0,
-            'fill-extrusion-color': getBuildingColorExpression(),
-            'fill-extrusion-opacity': 0.92
-          }
-        });
-
-        // 2D Crisp Outline Border
-        map.addLayer({
-          id: 'buildings-outline',
-          type: 'line',
-          source: 'buildings-source',
-          paint: {
-            'line-color': '#38bdf8',
-            'line-width': 1.0,
-            'line-opacity': 0.4
-          }
-        });
-      }
-
-      // Fly to bounds
-      if (minX !== Infinity && minY !== Infinity) {
-        map.fitBounds([[minX, minY], [maxX, maxY]], {
-          padding: 60,
-          pitch: 55,
-          bearing: -15,
-          duration: 2200,
-          maxZoom: 18.5
-        });
-      }
-
-      setLoading(false);
-    }
-
-    // Color ramp expressions
-    function getBuildingColorExpression() {
-      if (buildingColorMode === 'mono') {
-        return '#cbd5e1';
-      }
-      return [
-        'interpolate',
-        ['linear'],
-        ['coalesce', ['get', '_calc_h_max'], 3.0],
-        2.5, '#38bdf8',
-        6.0, '#34d399',
-        12.0, '#fbbf24',
-        22.0, '#f87171'
-      ];
-    }
-
-    function updateBuildingStyle() {
-      if (!map.getLayer('buildings-extruded')) return;
-      map.setPaintProperty('buildings-extruded', 'fill-extrusion-color', getBuildingColorExpression());
-      map.setPaintProperty('buildings-extruded', 'fill-extrusion-height', [
-        '*',
-        ['coalesce', ['get', '_calc_h_max'], 3.0],
-        heightMultiplier
-      ]);
-    }
-
+    // 3. MapLibre GL JS Initialization
     // =========================================================================
-    // 7. Event Listeners & Controls
+    // 6. Event Listeners & Controls
     // =========================================================================
     map.on('load', () => {
-      reloadRasterLayers();
+      loadPMTilesRasterLayer();
       loadBuildingFootprints();
 
       // Feature Click Popup & Inspector
@@ -562,7 +415,9 @@
 
     // Recenter Button
     document.getElementById('btn-recenter').addEventListener('click', () => {
-      if (buildingsGeojsonData) {
+      if (orthoBounds) {
+        map.fitBounds(orthoBounds, { padding: 50, pitch: 55, duration: 1500 });
+      } else if (buildingsGeojsonData) {
         loadBuildingFootprints();
       }
     });
@@ -571,7 +426,7 @@
     document.getElementById('gateway-selector').addEventListener('change', (e) => {
       activeGateway = e.target.value;
       showToast(`Switched gateway to: ${new URL(activeGateway).hostname}`);
-      reloadRasterLayers();
+      loadPMTilesRasterLayer();
       loadBuildingFootprints();
     });
 
@@ -586,11 +441,6 @@
       if (map.getLayer('ortho-pmtiles-layer')) {
         map.setPaintProperty('ortho-pmtiles-layer', 'raster-opacity', parseFloat(e.target.value) / 100);
       }
-    });
-
-    document.getElementById('toggle-elevation').addEventListener('change', reloadRasterLayers);
-    document.querySelectorAll('input[name="elev-mode"]').forEach(radio => {
-      radio.addEventListener('change', reloadRasterLayers);
     });
 
     document.getElementById('toggle-buildings').addEventListener('change', (e) => {
