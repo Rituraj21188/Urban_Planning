@@ -15,7 +15,7 @@
   <!-- PMTiles Protocol v3 -->
   <script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
 
-  <!-- Three.js + OrbitControls (Dedicated 3D Point Cloud Engine) -->
+  <!-- Three.js + OrbitControls (Dedicated 3D Engine) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
@@ -42,14 +42,10 @@
 </head>
 <body class="text-slate-100 select-none">
 
-  <!-- ===================================================================== -->
-  <!-- ENGINE 1: MapLibre GIS Orthomosaic View                                -->
-  <!-- ===================================================================== -->
+  <!-- ENGINE 1: MapLibre GIS Orthomosaic View -->
   <div id="map-engine-container" class="viewport-canvas"></div>
 
-  <!-- ===================================================================== -->
-  <!-- ENGINE 2: Dedicated Three.js Point Cloud View                         -->
-  <!-- ===================================================================== -->
+  <!-- ENGINE 2: Dedicated Three.js Point Cloud View -->
   <div id="three-engine-container" class="viewport-canvas hidden bg-slate-950"></div>
 
   <!-- Top Center Engine Switcher Toolbar -->
@@ -74,9 +70,7 @@
     </div>
   </header>
 
-  <!-- ===================================================================== -->
-  <!-- Floating Control Panel: Ortho HUD                                    -->
-  <!-- ===================================================================== -->
+  <!-- Floating Control Panel: Ortho HUD -->
   <aside id="ortho-controls-panel" class="absolute top-4 right-4 z-20 w-80 glass-hud rounded-2xl p-4 flex flex-col gap-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
       <div class="flex items-center gap-2">
@@ -127,16 +121,14 @@
     </div>
   </aside>
 
-  <!-- ===================================================================== -->
-  <!-- Floating Control Panel: Point Cloud HUD                              -->
-  <!-- ===================================================================== -->
+  <!-- Floating Control Panel: Point Cloud HUD -->
   <aside id="pcd-controls-panel" class="hidden absolute top-4 right-4 z-20 w-80 glass-hud rounded-2xl p-4 flex flex-col gap-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-cube text-purple-400 text-sm"></i>
         <h2 class="font-semibold text-xs tracking-wide uppercase text-slate-100">3D Point Cloud Engine</h2>
       </div>
-      <button id="btn-reset-3d-cam" class="text-[11px] text-purple-400 hover:underline">Reset Camera</button>
+      <button id="btn-reset-3d-cam" class="text-[11px] text-purple-400 hover:underline">Recenter Scene</button>
     </div>
 
     <div class="space-y-3 text-xs">
@@ -156,15 +148,10 @@
         <input type="range" id="slider-pt-size" min="0.5" max="8.0" step="0.5" value="2.5" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
       </div>
 
-      <div class="flex items-center justify-between">
-        <span class="text-slate-400 text-[11px]">Coordinate Grid Floor</span>
-        <input type="checkbox" id="toggle-grid" checked class="accent-purple-400 w-3.5 h-3.5 cursor-pointer" />
-      </div>
-
       <div class="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex flex-col gap-1">
         <div><i class="fa-solid fa-mouse text-purple-400 mr-1.5"></i> <b>Left Click + Drag:</b> Rotate 3D View</div>
-        <div><i class="fa-solid fa-arrows-up-down-left-right text-purple-400 mr-1.5"></i> <b>Right Click + Drag:</b> Pan Model</div>
-        <div><i class="fa-solid fa-magnifying-glass text-purple-400 mr-1.5"></i> <b>Scroll Wheel:</b> Zoom In / Out</div>
+        <div><i class="fa-solid fa-arrows-up-down-left-right text-purple-400 mr-1.5"></i> <b>Right Click + Drag:</b> Pan View</div>
+        <div><i class="fa-solid fa-magnifying-glass text-purple-400 mr-1.5"></i> <b>Scroll:</b> Zoom In / Out</div>
       </div>
     </div>
   </aside>
@@ -176,13 +163,10 @@
   </div>
 
   <script>
-    // =========================================================================
-    // Shared Config & URLs
-    // =========================================================================
     const PMTILES_URL = new URL("Urban_City_Ortho.pmtiles", window.location.href).href;
     const LAZ_URL = new URL("Urban_Plan_Compressed.laz", window.location.href).href;
 
-    let activeEngine = 'ortho'; // 'ortho' or 'pcd'
+    let activeEngine = 'ortho';
     let orthoBounds = null;
     let removeBlackBorder = true;
 
@@ -210,7 +194,6 @@
               const imgData = ctx.getImageData(0, 0, 256, 256);
               const data = imgData.data;
 
-              // Transparent alpha filter for rotation borders
               for (let i = 0; i < data.length; i += 4) {
                 const r = data[i], g = data[i + 1], b = data[i + 2];
                 if (r < 32 && g < 32 && b < 32 && Math.abs(r - g) <= 12 && Math.abs(g - b) <= 12) {
@@ -305,9 +288,7 @@
     const threeScene = new THREE.Scene();
     threeScene.background = new THREE.Color(0x0b0f19);
 
-    const threeCamera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 5000);
-    threeCamera.position.set(0, -350, 450);
-
+    const threeCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
     const threeRenderer = new THREE.WebGLRenderer({ antialias: true });
     threeRenderer.setSize(window.innerWidth, window.innerHeight);
     threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -317,17 +298,13 @@
     threeControls.enableDamping = true;
     threeControls.dampingFactor = 0.05;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-    threeScene.add(ambientLight);
-
-    const gridHelper = new THREE.GridHelper(600, 30, 0x38bdf8, 0x1e293b);
-    gridHelper.rotation.x = Math.PI / 2;
-    threeScene.add(gridHelper);
+    threeScene.add(new THREE.AmbientLight(0xffffff, 1.2));
 
     let pcdMesh = null;
     let pcdColorsRGB = null;
     let pcdColorsElevation = null;
     let isPcdLoaded = false;
+    let modelBoundingRadius = 500;
 
     async function loadPointcloudToThree() {
       if (isPcdLoaded) return;
@@ -348,7 +325,6 @@
         const pos = data.attributes.POSITION.value;
         const count = pos.length / 3;
 
-        // Subsample for smooth 60 FPS rotation if point count > 2.5M
         const step = count > 2500000 ? 2 : 1;
         const validCount = Math.floor(count / step);
 
@@ -358,32 +334,43 @@
 
         const colorAttr = data.attributes.COLOR_0 ? data.attributes.COLOR_0.value : null;
 
-        // 1. Calculate centroid to center model at (0,0,0)
-        let sumX = 0, sumY = 0, sumZ = 0;
-        for (let i = 0; i < count; i += step) {
-          sumX += pos[i * 3];
-          sumY += pos[i * 3 + 1];
-          sumZ += pos[i * 3 + 2];
-        }
-        const meanX = sumX / validCount;
-        const meanY = sumY / validCount;
-        const meanZ = sumZ / validCount;
-
+        // Calculate geographic bounding box and centroid
+        let minX = Infinity, maxX = -Infinity;
+        let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
+
+        for (let i = 0; i < count; i += step) {
+          const x = pos[i * 3];
+          const y = pos[i * 3 + 1];
+          const z = pos[i * 3 + 2];
+
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+
+        const extentX = maxX - minX;
+        const extentY = maxY - minY;
+        const extentZ = maxZ - minZ;
+        modelBoundingRadius = Math.max(extentX, extentY, extentZ) * 0.8 || 500;
+
+        const rangeZ = maxZ - minZ || 1.0;
         let dst = 0;
 
         for (let i = 0; i < count; i += step) {
-          const x = pos[i * 3] - meanX;
-          const y = pos[i * 3 + 1] - meanY;
-          const z = pos[i * 3 + 2] - meanZ;
-
-          if (z < minZ) minZ = z;
-          if (z > maxZ) maxZ = z;
+          const x = pos[i * 3] - centerX;
+          const y = pos[i * 3 + 1] - centerY;
+          const z = pos[i * 3 + 2] - centerZ;
 
           centeredPos[dst * 3] = x;
           centeredPos[dst * 3 + 1] = y;
           centeredPos[dst * 3 + 2] = z;
 
+          // True RGB
           if (colorAttr) {
             rgbColors[dst * 3] = colorAttr[i * 4] / 255.0;
             rgbColors[dst * 3 + 1] = colorAttr[i * 4 + 1] / 255.0;
@@ -393,22 +380,19 @@
             rgbColors[dst * 3 + 1] = 0.8;
             rgbColors[dst * 3 + 2] = 0.9;
           }
-          dst++;
-        }
 
-        // 2. Generate Elevation Gradient Ramp
-        const rangeZ = maxZ - minZ || 1.0;
-        for (let i = 0; i < validCount; i++) {
-          const normZ = (centeredPos[i * 3 + 2] - minZ) / rangeZ;
-          elevColors[i * 3] = Math.min(1.0, normZ * 1.6);
-          elevColors[i * 3 + 1] = Math.max(0.1, 1.0 - Math.abs(normZ - 0.5) * 2);
-          elevColors[i * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.6);
+          // Elevation Ramp
+          const normZ = (pos[i * 3 + 2] - minZ) / rangeZ;
+          elevColors[dst * 3] = Math.min(1.0, normZ * 1.6);
+          elevColors[dst * 3 + 1] = Math.max(0.1, 1.0 - Math.abs(normZ - 0.5) * 2);
+          elevColors[dst * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.6);
+
+          dst++;
         }
 
         pcdColorsRGB = rgbColors;
         pcdColorsElevation = elevColors;
 
-        // 3. Build Three.js Geometry
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(centeredPos, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(rgbColors, 3));
@@ -420,7 +404,14 @@
         });
 
         pcdMesh = new THREE.Points(geometry, material);
+
+        // Crucial: Rotate -90 degrees on X to convert GIS Z-up coordinate space to Three.js Y-up
+        pcdMesh.rotation.x = -Math.PI / 2;
+
         threeScene.add(pcdMesh);
+
+        // Adjust camera position to frame point cloud
+        reset3DCamera();
 
         isPcdLoaded = true;
         banner.classList.add('hidden');
@@ -431,6 +422,14 @@
         bannerText.innerText = "Failed to parse point cloud archive.";
         setTimeout(() => banner.classList.add('hidden'), 3500);
       }
+    }
+
+    function reset3DCamera() {
+      const dist = modelBoundingRadius * 1.5;
+      threeCamera.position.set(0, dist * 0.9, dist * 1.2);
+      threeCamera.lookAt(0, 0, 0);
+      threeControls.target.set(0, 0, 0);
+      threeControls.update();
     }
 
     function animateThree() {
@@ -534,22 +533,13 @@
       if (map.getLayer('local-ortho-layer')) map.setPaintProperty('local-ortho-layer', 'raster-contrast', val / 100);
     });
 
-    // Three.js Point Cloud Controls
     document.getElementById('slider-pt-size').addEventListener('input', (e) => {
       const val = parseFloat(e.target.value);
       document.getElementById('label-pt-size').innerText = `${val.toFixed(1)} px`;
       if (pcdMesh) pcdMesh.material.size = val;
     });
 
-    document.getElementById('toggle-grid').addEventListener('change', (e) => {
-      gridHelper.visible = e.target.checked;
-    });
-
-    document.getElementById('btn-reset-3d-cam').addEventListener('click', () => {
-      threeCamera.position.set(0, -350, 450);
-      threeControls.target.set(0, 0, 0);
-      threeControls.update();
-    });
+    document.getElementById('btn-reset-3d-cam').addEventListener('click', reset3DCamera);
 
     document.getElementById('btn-color-rgb').addEventListener('click', () => {
       if (!pcdMesh || !pcdColorsRGB) return;
