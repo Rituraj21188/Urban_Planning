@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Urban Digital Twin - Dual Engine Platform</title>
+  <title>Urban Digital Twin - GIS & 3D Point Cloud</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Tailwind CSS -->
@@ -15,7 +15,7 @@
   <!-- PMTiles Protocol v3 -->
   <script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
 
-  <!-- Three.js + OrbitControls (Dedicated 3D Engine) -->
+  <!-- Three.js + OrbitControls (3D Point Cloud Engine) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
@@ -27,7 +27,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #0b0f19; font-family: 'Inter', system-ui, sans-serif; }
+    body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #070a13; font-family: 'Inter', system-ui, sans-serif; }
     .viewport-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
     .glass-hud {
       background: rgba(15, 23, 42, 0.88);
@@ -48,11 +48,11 @@
   <!-- ENGINE 2: Dedicated Three.js Point Cloud View -->
   <div id="three-engine-container" class="viewport-canvas hidden bg-slate-950"></div>
 
-  <!-- Top Center Engine Switcher Toolbar -->
+  <!-- Top Center Switcher -->
   <nav class="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 glass-hud p-1.5 rounded-2xl">
     <button id="tab-btn-ortho" class="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 bg-sky-500/20 text-sky-300 border border-sky-500/30 transition">
       <i class="fa-solid fa-map"></i>
-      <span>Ortho GIS Viewer</span>
+      <span>Ortho GIS Map</span>
     </button>
     <button id="tab-btn-pcd" class="px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-slate-200 transition">
       <i class="fa-solid fa-cubes-stacked"></i>
@@ -70,7 +70,7 @@
     </div>
   </header>
 
-  <!-- Floating Control Panel: Ortho HUD -->
+  <!-- Floating Controls: Ortho HUD -->
   <aside id="ortho-controls-panel" class="absolute top-4 right-4 z-20 w-80 glass-hud rounded-2xl p-4 flex flex-col gap-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
       <div class="flex items-center gap-2">
@@ -91,7 +91,7 @@
       </div>
 
       <div class="flex items-center justify-between bg-slate-900/60 p-2 rounded-lg border border-slate-800">
-        <span class="text-slate-400 text-[11px]">Trim Black Rotation Border</span>
+        <span class="text-slate-400 text-[11px]">Trim Black Border</span>
         <input type="checkbox" id="toggle-transparent-black" checked class="accent-sky-400 w-3.5 h-3.5 cursor-pointer" />
       </div>
 
@@ -121,14 +121,14 @@
     </div>
   </aside>
 
-  <!-- Floating Control Panel: Point Cloud HUD -->
+  <!-- Floating Controls: Point Cloud HUD -->
   <aside id="pcd-controls-panel" class="hidden absolute top-4 right-4 z-20 w-80 glass-hud rounded-2xl p-4 flex flex-col gap-4">
     <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-cube text-purple-400 text-sm"></i>
         <h2 class="font-semibold text-xs tracking-wide uppercase text-slate-100">3D Point Cloud Engine</h2>
       </div>
-      <button id="btn-reset-3d-cam" class="text-[11px] text-purple-400 hover:underline">Recenter Scene</button>
+      <button id="btn-reset-3d-cam" class="text-[11px] text-purple-400 hover:underline">Recenter</button>
     </div>
 
     <div class="space-y-3 text-xs">
@@ -143,22 +143,22 @@
       <div class="space-y-1">
         <div class="flex justify-between text-slate-400 text-[11px]">
           <span>Point Size</span>
-          <span id="label-pt-size" class="text-purple-300 font-mono">2.5 px</span>
+          <span id="label-pt-size" class="text-purple-300 font-mono">1.8 px</span>
         </div>
-        <input type="range" id="slider-pt-size" min="0.5" max="8.0" step="0.5" value="2.5" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
+        <input type="range" id="slider-pt-size" min="0.5" max="6.0" step="0.2" value="1.8" class="w-full accent-purple-400 cursor-pointer h-1.5 bg-slate-700 rounded-lg" />
       </div>
 
       <div class="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex flex-col gap-1">
         <div><i class="fa-solid fa-mouse text-purple-400 mr-1.5"></i> <b>Left Click + Drag:</b> Rotate 3D View</div>
         <div><i class="fa-solid fa-arrows-up-down-left-right text-purple-400 mr-1.5"></i> <b>Right Click + Drag:</b> Pan View</div>
-        <div><i class="fa-solid fa-magnifying-glass text-purple-400 mr-1.5"></i> <b>Scroll:</b> Zoom In / Out</div>
+        <div><i class="fa-solid fa-magnifying-glass text-purple-400 mr-1.5"></i> <b>Scroll Wheel:</b> Zoom In / Out</div>
       </div>
     </div>
   </aside>
 
-  <!-- Progress Notification Banner -->
+  <!-- Progress Banner -->
   <div id="loader-banner" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-30 glass-hud px-4 py-2.5 rounded-xl flex items-center gap-3 text-xs shadow-2xl">
-    <i class="fa-solid fa-circle-notch fa-spin text-sky-400"></i>
+    <i class="fa-solid fa-circle-notch fa-spin text-purple-400"></i>
     <span id="loader-text" class="text-slate-200">Processing...</span>
   </div>
 
@@ -171,7 +171,7 @@
     let removeBlackBorder = true;
 
     // =========================================================================
-    // ENGINE 1: MapLibre GIS + PMTiles Orthomosaic
+    // 1. ENGINE 1: MapLibre GIS + PMTiles Orthomosaic
     // =========================================================================
     const tileCanvas = document.createElement('canvas');
     tileCanvas.width = 256;
@@ -194,6 +194,7 @@
               const imgData = ctx.getImageData(0, 0, 256, 256);
               const data = imgData.data;
 
+              // Convert near-black JPEG border artifacts to transparent
               for (let i = 0; i < data.length; i += 4) {
                 const r = data[i], g = data[i + 1], b = data[i + 2];
                 if (r < 32 && g < 32 && b < 32 && Math.abs(r - g) <= 12 && Math.abs(g - b) <= 12) {
@@ -282,14 +283,14 @@
     });
 
     // =========================================================================
-    // ENGINE 2: Dedicated Three.js Point Cloud View
+    // 2. ENGINE 2: Dedicated Three.js Point Cloud View
     // =========================================================================
     const threeContainer = document.getElementById('three-engine-container');
     const threeScene = new THREE.Scene();
-    threeScene.background = new THREE.Color(0x0b0f19);
+    threeScene.background = new THREE.Color(0x070a13);
 
-    const threeCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100000);
-    const threeRenderer = new THREE.WebGLRenderer({ antialias: true });
+    const threeCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 50000);
+    const threeRenderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     threeRenderer.setSize(window.innerWidth, window.innerHeight);
     threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     threeContainer.appendChild(threeRenderer.domElement);
@@ -304,7 +305,7 @@
     let pcdColorsRGB = null;
     let pcdColorsElevation = null;
     let isPcdLoaded = false;
-    let modelBoundingRadius = 500;
+    let sceneBoundingRadius = 300;
 
     async function loadPointcloudToThree() {
       if (isPcdLoaded) return;
@@ -312,7 +313,7 @@
       const banner = document.getElementById('loader-banner');
       const bannerText = document.getElementById('loader-text');
       banner.classList.remove('hidden');
-      bannerText.innerText = "Downloading Urban_Plan_Compressed.laz from repository...";
+      bannerText.innerText = "Downloading Urban_Plan_Compressed.laz...";
 
       try {
         const response = await fetch(LAZ_URL);
@@ -323,23 +324,18 @@
         const data = await loaders.load(arrayBuffer, loaders.LASLoader);
 
         const pos = data.attributes.POSITION.value;
-        const count = pos.length / 3;
+        const totalPoints = pos.length / 3;
 
-        const step = count > 2500000 ? 2 : 1;
-        const validCount = Math.floor(count / step);
+        // Balance point budget for smooth 60 FPS WebGL
+        const step = totalPoints > 2500000 ? 2 : 1;
+        const count = Math.floor(totalPoints / step);
 
-        const centeredPos = new Float32Array(validCount * 3);
-        const rgbColors = new Float32Array(validCount * 3);
-        const elevColors = new Float32Array(validCount * 3);
-
-        const colorAttr = data.attributes.COLOR_0 ? data.attributes.COLOR_0.value : null;
-
-        // Calculate geographic bounding box and centroid
+        // Compute Bounding Box
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
 
-        for (let i = 0; i < count; i += step) {
+        for (let i = 0; i < totalPoints; i += step) {
           const x = pos[i * 3];
           const y = pos[i * 3 + 1];
           const z = pos[i * 3 + 2];
@@ -349,43 +345,58 @@
           if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
         }
 
-        const centerX = (minX + maxX) / 2;
-        const centerY = (minY + maxY) / 2;
-        const centerZ = (minZ + maxZ) / 2;
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        const midZ = (minZ + maxZ) / 2;
 
-        const extentX = maxX - minX;
-        const extentY = maxY - minY;
-        const extentZ = maxZ - minZ;
-        modelBoundingRadius = Math.max(extentX, extentY, extentZ) * 0.8 || 500;
+        // Check if coordinates are in WGS84 Geographic Degrees (< 360) vs Metric UTM
+        const isGeographicDegrees = (Math.abs(midX) <= 180 && Math.abs(midY) <= 90);
 
+        // Planar metric scaling factors for Geographic WGS84
+        const latRad = (midY * Math.PI) / 180.0;
+        const metersPerDegLon = isGeographicDegrees ? (111320.0 * Math.cos(latRad)) : 1.0;
+        const metersPerDegLat = isGeographicDegrees ? 110540.0 : 1.0;
+
+        const centeredPos = new Float32Array(count * 3);
+        const rgbColors = new Float32Array(count * 3);
+        const elevColors = new Float32Array(count * 3);
+
+        const colorAttr = data.attributes.COLOR_0 ? data.attributes.COLOR_0.value : null;
         const rangeZ = maxZ - minZ || 1.0;
         let dst = 0;
 
-        for (let i = 0; i < count; i += step) {
-          const x = pos[i * 3] - centerX;
-          const y = pos[i * 3 + 1] - centerY;
-          const z = pos[i * 3 + 2] - centerZ;
+        for (let i = 0; i < totalPoints; i += step) {
+          const rawX = pos[i * 3];
+          const rawY = pos[i * 3 + 1];
+          const rawZ = pos[i * 3 + 2];
 
-          centeredPos[dst * 3] = x;
-          centeredPos[dst * 3 + 1] = y;
-          centeredPos[dst * 3 + 2] = z;
+          // Metric offsets relative to centroid
+          const metricX = (rawX - midX) * metersPerDegLon;
+          const metricY = (rawY - midY) * metersPerDegLat;
+          const metricZ = rawZ - midZ;
 
-          // True RGB
+          // Align to Three.js coordinates:
+          // X = East-West, Y = Elevation (Up), Z = -North (Depth)
+          centeredPos[dst * 3]     = metricX;
+          centeredPos[dst * 3 + 1] = metricZ;
+          centeredPos[dst * 3 + 2] = -metricY;
+
+          // True RGB mapping
           if (colorAttr) {
-            rgbColors[dst * 3] = colorAttr[i * 4] / 255.0;
+            rgbColors[dst * 3]     = colorAttr[i * 4] / 255.0;
             rgbColors[dst * 3 + 1] = colorAttr[i * 4 + 1] / 255.0;
             rgbColors[dst * 3 + 2] = colorAttr[i * 4 + 2] / 255.0;
           } else {
-            rgbColors[dst * 3] = 0.2;
+            rgbColors[dst * 3]     = 0.3;
             rgbColors[dst * 3 + 1] = 0.8;
             rgbColors[dst * 3 + 2] = 0.9;
           }
 
-          // Elevation Ramp
-          const normZ = (pos[i * 3 + 2] - minZ) / rangeZ;
-          elevColors[dst * 3] = Math.min(1.0, normZ * 1.6);
+          // Elevation Color Ramp
+          const normZ = (rawZ - minZ) / rangeZ;
+          elevColors[dst * 3]     = Math.min(1.0, normZ * 1.5);
           elevColors[dst * 3 + 1] = Math.max(0.1, 1.0 - Math.abs(normZ - 0.5) * 2);
-          elevColors[dst * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.6);
+          elevColors[dst * 3 + 2] = Math.max(0.0, 1.0 - normZ * 1.5);
 
           dst++;
         }
@@ -393,40 +404,40 @@
         pcdColorsRGB = rgbColors;
         pcdColorsElevation = elevColors;
 
+        const extentX = (maxX - minX) * metersPerDegLon;
+        const extentY = (maxY - minY) * metersPerDegLat;
+        const extentZ = maxZ - minZ;
+        sceneBoundingRadius = Math.max(extentX, extentY, extentZ) * 0.75 || 300;
+
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(centeredPos, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(rgbColors, 3));
 
         const material = new THREE.PointsMaterial({
-          size: 2.5,
+          size: 1.8,
           vertexColors: true,
           sizeAttenuation: true
         });
 
         pcdMesh = new THREE.Points(geometry, material);
-
-        // Crucial: Rotate -90 degrees on X to convert GIS Z-up coordinate space to Three.js Y-up
-        pcdMesh.rotation.x = -Math.PI / 2;
-
         threeScene.add(pcdMesh);
 
-        // Adjust camera position to frame point cloud
         reset3DCamera();
 
         isPcdLoaded = true;
         banner.classList.add('hidden');
-        document.getElementById('status-text').innerText = `3D Active: ${validCount.toLocaleString()} pts`;
+        document.getElementById('status-text').innerText = `3D Active: ${count.toLocaleString()} pts`;
 
       } catch (err) {
-        console.error("Three.js LAZ parse error:", err);
+        console.error("Three.js point cloud load error:", err);
         bannerText.innerText = "Failed to parse point cloud archive.";
         setTimeout(() => banner.classList.add('hidden'), 3500);
       }
     }
 
     function reset3DCamera() {
-      const dist = modelBoundingRadius * 1.5;
-      threeCamera.position.set(0, dist * 0.9, dist * 1.2);
+      const dist = sceneBoundingRadius * 1.6;
+      threeCamera.position.set(0, dist * 0.8, dist * 1.1);
       threeCamera.lookAt(0, 0, 0);
       threeControls.target.set(0, 0, 0);
       threeControls.update();
@@ -442,7 +453,7 @@
     animateThree();
 
     // =========================================================================
-    // Module Switcher Handlers
+    // 3. UI Handlers
     // =========================================================================
     const btnOrthoTab = document.getElementById('tab-btn-ortho');
     const btnPcdTab = document.getElementById('tab-btn-pcd');
@@ -455,12 +466,12 @@
       activeEngine = 'ortho';
       btnOrthoTab.className = "px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 bg-sky-500/20 text-sky-300 border border-sky-500/30 transition";
       btnPcdTab.className = "px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-slate-200 transition";
-      
+
       orthoContainer.classList.remove('hidden');
       threeContainer.classList.add('hidden');
       orthoPanel.classList.remove('hidden');
       pcdPanel.classList.add('hidden');
-      
+
       platformTitle.innerText = "Ortho GIS Module";
       platformTitle.className = "font-bold tracking-wide text-xs uppercase text-sky-400";
       map.resize();
@@ -470,7 +481,7 @@
       activeEngine = 'pcd';
       btnPcdTab.className = "px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 bg-purple-500/20 text-purple-300 border border-purple-500/30 transition";
       btnOrthoTab.className = "px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 text-slate-400 hover:text-slate-200 transition";
-      
+
       orthoContainer.classList.add('hidden');
       threeContainer.classList.remove('hidden');
       orthoPanel.classList.add('hidden');
@@ -486,9 +497,6 @@
       loadPointcloudToThree();
     });
 
-    // =========================================================================
-    // UI Controls (Ortho & PCD)
-    // =========================================================================
     document.getElementById('btn-recenter-ortho').addEventListener('click', () => {
       if (orthoBounds) map.fitBounds(orthoBounds, { padding: 40, duration: 1500 });
     });
